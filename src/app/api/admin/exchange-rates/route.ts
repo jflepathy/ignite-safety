@@ -33,10 +33,16 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { currencyCode, rateToBase, locked } = parsed.data;
 
-  const rate = await prisma.exchangeRate.upsert({
-    where: { currencyCode: currencyCode.toUpperCase() },
-    create: { currencyCode: currencyCode.toUpperCase(), rateToBase, isManualOverride: true, locked: locked ?? false, source: 'manual' },
-    update: { rateToBase, isManualOverride: true, locked: locked ?? undefined, source: 'manual' },
-  });
+  // Sequential find-then-write instead of upsert() — see src/lib/prisma.ts.
+  const code = currencyCode.toUpperCase();
+  const existingRate = await prisma.exchangeRate.findUnique({ where: { currencyCode: code } });
+  const rate = existingRate
+    ? await prisma.exchangeRate.update({
+        where: { currencyCode: code },
+        data: { rateToBase, isManualOverride: true, locked: locked ?? undefined, source: 'manual' },
+      })
+    : await prisma.exchangeRate.create({
+        data: { currencyCode: code, rateToBase, isManualOverride: true, locked: locked ?? false, source: 'manual' },
+      });
   return NextResponse.json(rate);
 }

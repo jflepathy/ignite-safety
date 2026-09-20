@@ -35,8 +35,13 @@ export async function POST(req: NextRequest) {
     for (const raw of rows) {
       const record = rehydrateDates(raw);
       try {
+        // Sequential find-then-write instead of upsert() — see src/lib/prisma.ts.
         // eslint-disable-next-line no-await-in-loop
-        await delegate.upsert({ where: { id: record.id }, create: record, update: record });
+        const existingRow = await delegate.findUnique({ where: { id: record.id } });
+        // eslint-disable-next-line no-await-in-loop
+        if (existingRow) await delegate.update({ where: { id: record.id }, data: record });
+        // eslint-disable-next-line no-await-in-loop
+        else await delegate.create({ data: record });
         restored += 1;
       } catch {
         failed += 1;

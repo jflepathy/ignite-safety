@@ -33,11 +33,20 @@ export async function PUT(req: NextRequest) {
   if (allowed === null) {
     await prisma.userPermissionOverride.deleteMany({ where: { userId, moduleKey } });
   } else {
-    await prisma.userPermissionOverride.upsert({
+    // Sequential find-then-write instead of upsert() — the Neon HTTP driver
+    // adapter (used so this runs on Cloudflare Workers) doesn't support the
+    // implicit transaction Prisma wraps upsert() in.
+    const existingOverride = await prisma.userPermissionOverride.findUnique({
       where: { userId_moduleKey: { userId, moduleKey } },
-      create: { userId, moduleKey, allowed },
-      update: { allowed },
     });
+    if (existingOverride) {
+      await prisma.userPermissionOverride.update({
+        where: { userId_moduleKey: { userId, moduleKey } },
+        data: { allowed },
+      });
+    } else {
+      await prisma.userPermissionOverride.create({ data: { userId, moduleKey, allowed } });
+    }
   }
 
   await prisma.auditLog.create({

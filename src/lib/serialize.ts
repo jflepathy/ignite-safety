@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+// Explicit "/wasm" import, left external — see src/lib/prisma.ts for why.
+import { Prisma } from '@prisma/client/wasm';
 
 /**
  * Deep-converts Prisma Decimal instances and Date objects into plain

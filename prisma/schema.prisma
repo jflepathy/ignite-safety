@@ -4,8 +4,22 @@
 // servicing outreach/scheduling + digital work orders / technician POS.
 // ============================================================================
 
+// Classic generator, with the "driverAdapters" preview feature turned on.
+// Combined with the PrismaNeonHTTP driver adapter in src/lib/prisma.ts,
+// this routes queries entirely through the adapter (fetch-based, no native
+// binary) instead of needing a platform-specific query engine binary —
+// which is what makes this runnable in Cloudflare Workers. Without this
+// previewFeatures flag, PrismaClient still tries to load a native query
+// engine at init even when an `adapter` is passed in, which is what was
+// causing the "could not locate the Query Engine for runtime
+// debian-openssl-1.1.x" error in production.
+// (The newer "prisma-client" generator with engineType="client" was tried
+// first but has an open upstream bug that breaks it specifically on
+// Workers — import.meta.url is undefined there — so this proven classic
+// combination is used instead.)
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

@@ -1,8 +1,25 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { DEFAULT_LOGO_WHITE_BG, DEFAULT_LOGO_TRANSPARENT } from './assets/default-logos';
+// Node-only client (see prisma-client-node.ts) — this script runs locally
+// via tsx, not on Cloudflare Workers, so it can't use the app's wasm-based
+// shared client (src/lib/prisma.ts). Both still talk to Neon over plain
+// HTTPS via the same PrismaNeonHTTP adapter.
+import { prisma } from './prisma-client-node';
 
-const prisma = new PrismaClient();
+// find-then-create instead of upsert() — the Neon HTTP driver adapter
+// (needed so this app runs on Cloudflare Workers) doesn't support the
+// implicit transaction Prisma wraps upsert() in. Every upsert below was of
+// the "leave it alone if it exists, otherwise create it" shape (update: {}),
+// so this is an exact behavioral match, re-runnable just like the upserts
+// were.
+async function findOrCreate<T>(
+  delegate: { findUnique: (args: { where: any }) => Promise<T | null>; create: (args: { data: any }) => Promise<T> },
+  where: any,
+  data: any
+): Promise<T> {
+  const existing = await delegate.findUnique({ where });
+  return existing ?? delegate.create({ data });
+}
 
 // ---------------------------------------------------------------------------
 // This is the PRODUCTION seed: it sets up the operational scaffolding an
@@ -18,10 +35,10 @@ async function main() {
   // --- App Settings (singleton) -- from the Certificate of Registration
   // (BRN B8436760, dated 6 Mar 2024) and the SRC TIN Letter (TIN 999624349,
   // dated 12 Apr 2024) ---
-  await prisma.appSettings.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
+  await findOrCreate(
+    prisma.appSettings,
+    { id: 1 },
+    {
       id: 1,
       companyName: 'Ignite Safety',
       legalName: 'Ignite Safety',
@@ -41,38 +58,38 @@ async function main() {
       overdueThresholdDays: 30,
       defaultServiceIntervalMonths: 12,
       reminderLeadDays: 45,
-    },
-  });
+    }
+  );
 
   // --- Users ---
   const passwordHash = await bcrypt.hash('password123', 10);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@ignitesafety.sc' },
-    update: {},
-    create: { name: 'Jean-Francois Lepathy', email: 'admin@ignitesafety.sc', passwordHash, role: 'ADMIN' },
-  });
-  const sales = await prisma.user.upsert({
-    where: { email: 'sales@ignitesafety.sc' },
-    update: {},
-    create: { name: 'Marie-Ange Confait', email: 'sales@ignitesafety.sc', passwordHash, role: 'SALES' },
-  });
-  const tech1 = await prisma.user.upsert({
-    where: { email: 'tech@ignitesafety.sc' },
-    update: {},
-    create: { name: 'Jonathan Camille', email: 'tech@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' },
-  });
-  const tech2 = await prisma.user.upsert({
-    where: { email: 'tech2@ignitesafety.sc' },
-    update: {},
-    create: { name: 'Keddy Barbe', email: 'tech2@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' },
-  });
+  const admin = await findOrCreate(
+    prisma.user,
+    { email: 'admin@ignitesafety.sc' },
+    { name: 'Jean-Francois Lepathy', email: 'admin@ignitesafety.sc', passwordHash, role: 'ADMIN' }
+  );
+  const sales = await findOrCreate(
+    prisma.user,
+    { email: 'sales@ignitesafety.sc' },
+    { name: 'Marie-Ange Confait', email: 'sales@ignitesafety.sc', passwordHash, role: 'SALES' }
+  );
+  const tech1 = await findOrCreate(
+    prisma.user,
+    { email: 'tech@ignitesafety.sc' },
+    { name: 'Jonathan Camille', email: 'tech@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
+  );
+  const tech2 = await findOrCreate(
+    prisma.user,
+    { email: 'tech2@ignitesafety.sc' },
+    { name: 'Keddy Barbe', email: 'tech2@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
+  );
 
   // --- Tax Rates ---
-  const vat = await prisma.taxRate.upsert({
-    where: { id: 'seed-vat-15' },
-    update: {},
-    create: { id: 'seed-vat-15', name: 'SCR VAT 15%', ratePercent: 15, isDefault: true },
-  });
+  const vat = await findOrCreate(
+    prisma.taxRate,
+    { id: 'seed-vat-15' },
+    { id: 'seed-vat-15', name: 'SCR VAT 15%', ratePercent: 15, isDefault: true }
+  );
   await prisma.appSettings.update({ where: { id: 1 }, data: { defaultTaxRateId: vat.id } });
 
   // --- Equipment Type Catalog ---
@@ -87,16 +104,16 @@ async function main() {
     { category: 'FIRE_ALARM_PANEL', label: 'Fire Alarm Panel', months: 12, hydro: false },
   ];
   for (const c of catalogEntries) {
-    await prisma.equipmentTypeCatalog.upsert({
-      where: { category: c.category },
-      update: {},
-      create: {
+    await findOrCreate(
+      prisma.equipmentTypeCatalog,
+      { category: c.category },
+      {
         category: c.category,
         label: c.label,
         defaultIntervalMonths: c.months,
         requiresHydrostatic: c.hydro,
-      },
-    });
+      }
+    );
   }
 
   // --- Real Service/Product Catalog -- derived from Ignite Safety's actual
@@ -116,11 +133,11 @@ async function main() {
   ];
   const shopItems: Record<string, string> = {};
   for (const item of shopItemDefs) {
-    const created = await prisma.shopItem.upsert({
-      where: { sku: item.sku },
-      update: {},
-      create: { ...item, unitPrice: item.unitPrice, taxable: true },
-    });
+    const created = await findOrCreate(
+      prisma.shopItem,
+      { sku: item.sku },
+      { ...item, unitPrice: item.unitPrice, taxable: true }
+    );
     shopItems[item.sku] = created.id;
   }
 
@@ -141,28 +158,24 @@ async function main() {
   ];
   const accounts: Record<string, string> = {};
   for (const a of accountDefs) {
-    const acc = await prisma.account.upsert({
-      where: { code: a.code },
-      update: {},
-      create: a,
-    });
+    const acc = await findOrCreate(prisma.account, { code: a.code }, a);
     accounts[a.code] = acc.id;
   }
   // Bank account record is structural (mirrors the "Operating Bank Account"
   // GL account above) but starts at a real SCR 0 balance rather than a fake
   // demo figure — the user enters their actual opening balance once live.
-  await prisma.bankAccount.upsert({
-    where: { accountId: accounts['1000'] },
-    update: {},
-    create: {
+  await findOrCreate(
+    prisma.bankAccount,
+    { accountId: accounts['1000'] },
+    {
       accountId: accounts['1000'],
       name: 'Operating Bank Account',
       accountType: 'CHECKING',
       openingBalance: 0,
       currentBalance: 0,
       currencyCode: 'SCR',
-    },
-  });
+    }
+  );
 
   // --- Tags ---
   for (const t of [
@@ -170,7 +183,7 @@ async function main() {
     { name: 'Government', color: '#2563eb' },
     { name: 'Overdue Follow-up', color: '#d97706' },
   ]) {
-    await prisma.tag.upsert({ where: { name: t.name }, update: {}, create: t });
+    await findOrCreate(prisma.tag, { name: t.name }, t);
   }
 
   console.log('Seed complete.');

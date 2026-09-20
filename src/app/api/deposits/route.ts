@@ -25,15 +25,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { date, ...rest } = parsed.data;
 
-  const deposit = await prisma.$transaction(async (tx) => {
-    const d = await tx.deposit.create({
-      data: { ...rest, date: date ? new Date(date) : new Date(), createdById: session!.user.id },
-    });
-    await tx.bankAccount.update({
-      where: { id: rest.bankAccountId },
-      data: { currentBalance: { increment: rest.amount } },
-    });
-    return d;
+  // Sequential writes instead of $transaction() — the Neon HTTP driver
+  // adapter (needed to run on Cloudflare Workers) doesn't support it. The
+  // balance update is a single atomic `increment` statement on its own, so
+  // the only residual risk versus a real transaction is the process dying
+  // between these two calls (deposit recorded, balance not yet bumped) —
+  // rare, and recoverable by reconciling against the deposit record.
+  const deposit = await prisma.deposit.create({
+    data: { ...rest, date: date ? new Date(date) : new Date(), createdById: session!.user.id },
+  });
+  await prisma.bankAccount.update({
+    where: { id: rest.bankAccountId },
+    data: { currentBalance: { increment: rest.amount } },
   });
 
   return NextResponse.json(deposit, { status: 201 });

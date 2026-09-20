@@ -28,15 +28,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
 
-  const adjustment = await prisma.$transaction(async (tx) => {
-    const adj = await tx.inventoryAdjustment.create({
-      data: { ...data, createdById: session!.user.id },
-    });
-    await tx.shopItem.update({
-      where: { id: data.shopItemId },
-      data: { quantityOnHand: { increment: data.quantityChange } },
-    });
-    return adj;
+  // Sequential writes instead of $transaction() — see src/lib/prisma.ts.
+  const adjustment = await prisma.inventoryAdjustment.create({
+    data: { ...data, createdById: session!.user.id },
+  });
+  await prisma.shopItem.update({
+    where: { id: data.shopItemId },
+    data: { quantityOnHand: { increment: data.quantityChange } },
   });
 
   return NextResponse.json(adjustment, { status: 201 });

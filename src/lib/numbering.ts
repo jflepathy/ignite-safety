@@ -1,3 +1,5 @@
+// Explicit "/wasm" import, left external — see src/lib/prisma.ts for why.
+import { Prisma } from '@prisma/client/wasm';
 import { prisma } from '@/lib/prisma';
 
 type SeqField =
@@ -30,6 +32,38 @@ type PrefixField =
   | 'journalEntryPrefix'
   | 'itemSkuPrefix';
 
+// Field names above come only from the fixed SeqField/PrefixField unions
+// (never user input), so interpolating them as column names below is safe.
+
+/**
+ * Atomically reserves the next sequence value for a counter column and
+ * returns the reserved number plus the prefix, in one round trip.
+ *
+ * This used to be `prisma.$transaction(async (tx) => { read; write })`, but
+ * the Neon HTTP driver adapter (needed to run on Cloudflare Workers) doesn't
+ * support Prisma transactions. A single `UPDATE ... RETURNING` is actually
+ * the more correct way to do this anyway — one atomic statement the
+ * database itself serializes, with no read-modify-write race window at all
+ * (the old transaction still had one under Postgres's default isolation
+ * level; this raw increment doesn't).
+ */
+async function reserveNextSeq(
+  seqField: SeqField,
+  prefixField: PrefixField
+): Promise<{ prefix: string; seq: number }> {
+  const seqCol = Prisma.raw(`"${seqField}"`);
+  const prefixCol = Prisma.raw(`"${prefixField}"`);
+  const rows = await prisma.$queryRaw<{ prefix: string; seq: number }[]>(Prisma.sql`
+    UPDATE "app_settings"
+    SET ${seqCol} = ${seqCol} + 1
+    WHERE id = 1
+    RETURNING ${prefixCol} AS prefix, ${seqCol} - 1 AS seq
+  `);
+  const settings = rows[0];
+  if (!settings) throw new Error('AppSettings not initialized. Run the seed script.');
+  return settings;
+}
+
 /**
  * Atomically reserves the next sequence number for a document type and
  * returns a formatted document number, e.g. "WO-2026-0388".
@@ -40,19 +74,7 @@ export async function nextDocumentNumber(
   prefixField: PrefixField
 ): Promise<string> {
   const year = new Date().getFullYear();
-
-  const settings = await prisma.$transaction(async (tx) => {
-    const current = await tx.appSettings.findUnique({ where: { id: 1 } });
-    if (!current) throw new Error('AppSettings not initialized. Run the seed script.');
-
-    const nextSeq = current[seqField] + 1;
-    const updated = await tx.appSettings.update({
-      where: { id: 1 },
-      data: { [seqField]: nextSeq },
-    });
-    return { prefix: current[prefixField], seq: current[seqField] };
-  });
-
+  const settings = await reserveNextSeq(seqField, prefixField);
   const padded = String(settings.seq).padStart(4, '0');
   return `${settings.prefix}-${year}-${padded}`;
 }
@@ -62,12 +84,7 @@ export async function nextDocumentNumber(
  * Staff can still type a fully custom SKU instead — this is only used
  * when they click "Auto-generate". */
 export async function nextItemSku(): Promise<string> {
-  const settings = await prisma.$transaction(async (tx) => {
-    const current = await tx.appSettings.findUnique({ where: { id: 1 } });
-    if (!current) throw new Error('AppSettings not initialized. Run the seed script.');
-    await tx.appSettings.update({ where: { id: 1 }, data: { itemSkuNextSeq: current.itemSkuNextSeq + 1 } });
-    return { prefix: current.itemSkuPrefix, seq: current.itemSkuNextSeq };
-  });
+  const settings = await reserveNextSeq('itemSkuNextSeq', 'itemSkuPrefix');
   const padded = String(settings.seq).padStart(4, '0');
   return `${settings.prefix}-${padded}`;
 }

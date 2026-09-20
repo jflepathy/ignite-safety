@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import clients from './data/clients.json';
-
-const prisma = new PrismaClient();
+// Node-only client — see prisma-client-node.ts and the comment in seed.ts.
+import { prisma } from './prisma-client-node';
 
 // ---------------------------------------------------------------------------
 // One-time (re-runnable) import of Ignite Safety's real historical client

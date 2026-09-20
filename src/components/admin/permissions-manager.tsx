@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MODULE_KEYS, MODULE_LABELS } from '@/lib/permissions';
+import { MODULE_KEYS, MODULE_LABELS } from '@/lib/permissions-constants';
 
 type User = { id: string; name: string; email: string; role: string };
 type Override = { userId: string; moduleKey: string; allowed: boolean };
