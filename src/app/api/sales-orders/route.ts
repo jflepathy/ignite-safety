@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/api-auth';
+import { nextDocumentNumber } from '@/lib/numbering';
+import { computeDocumentTotals } from '@/lib/money';
+import { z } from 'zod';
+
+export async function GET() {
+  const { error } = await requireRole('ADMIN', 'SALES');
+  if (error) return error;
+  const orders = await prisma.salesOrder.findMany({
+    include: { customer: true, lineItems: true },
+    orderBy: { orderDate: 'desc' },
+  });
+  return NextResponse.json(orders);
+}
+
+const LineSchema = z.object({
+  description: z.string().min(1),
+  quantity: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  taxRateId: z.string().optional().nullable(),
+  taxRatePercent: z.number().min(0).max(100).default(0),
+});
+
+const CreateSchema = z.object({
+  customerId: z.string().min(1),
+  globalDiscountPercent: z.number().min(0).max(100).default(0),
+  notes: z.string().optional(),
+  lineItems: z.array(LineSchema).min(1),
+});
+
+export async function POST(req: NextRequest) {
+  const { session, error } = await requireRole('ADMIN', 'SALES');
+  if (error) return error;
+  const body = await req.json();
+  const parsed = CreateSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const data = parsed.data;
+
+  const totals = computeDocumentTotals(data.lineItems, data.globalDiscountPercent);
+  const orderNumber = await nextDocumentNumber('salesOrderNextSeq', 'salesOrderPrefix');
+
+  const order = await prisma.salesOrder.create({
+    data: {
+      orderNumber,
+      customerId: data.customerId,
+      globalDiscountPercent: data.globalDiscountPercent,
+      subtotal: totals.subtotal,
+      discountTotal: totals.discountTotal,
+      taxTotal: totals.taxTotal,
+      total: totals.total,
+      notes: data.notes,
+      createdById: session!.user.id,
+      lineItems: {
+        create: data.lineItems.map((li, idx) => ({
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          taxRateId: li.taxRateId || null,
+          lineTotal: totals.lines[idx].lineTotal,
+          sortOrder: idx,
+        })),
+      },
+    },
+    include: { lineItems: true, customer: true },
+  });
+
+  return NextResponse.json(order, { status: 201 });
+}

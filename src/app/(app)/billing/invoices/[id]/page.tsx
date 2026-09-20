@@ -1,0 +1,158 @@
+import { prisma } from '@/lib/prisma';
+import { notFound } from 'next/navigation';
+import { formatMoney } from '@/lib/money';
+import { StatusBadge } from '@/components/status-badge';
+import RecordPaymentForm from '@/components/billing/record-payment-form';
+import PrintButton from '@/components/print-button';
+import PrintOnLoad from '@/components/shared/print-on-load';
+import ShareLinkButton from '@/components/shared/share-link-button';
+import AttachmentsPanel from '@/components/shared/attachments-panel';
+import InvoiceDocument from '@/components/billing/invoice-document';
+
+export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
+  const [invoice, settings] = await Promise.all([
+    prisma.invoice.findUnique({
+      where: { id: params.id },
+      include: {
+        customer: true,
+        lineItems: { include: { taxRate: true, shopItem: true }, orderBy: { sortOrder: 'asc' } },
+        payments: { orderBy: { paidAt: 'desc' } },
+        workOrder: true,
+      },
+    }),
+    prisma.appSettings.findUnique({ where: { id: 1 } }),
+  ]);
+  if (!invoice) notFound();
+
+  const attachments = await prisma.attachment.findMany({
+    where: { entityType: 'Invoice', entityId: invoice.id },
+    orderBy: { createdAt: 'desc' },
+  });
+  const paymentOptions = (invoice.customerPaymentOptions as Record<string, boolean> | null) ?? {};
+  const paymentOptionLabels: Record<string, string> = { card: 'Card', bankTransfer: 'Bank Transfer', cash: 'Cash' };
+
+  const currency = settings?.currencyCode ?? 'SCR';
+  const allowedMethods = (settings?.allowedPaymentMethods as string[]) ?? ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'];
+
+  return (
+    <div className="space-y-6">
+      <PrintOnLoad />
+      <div className="flex items-start justify-between print:hidden">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink-900">{invoice.invoiceNumber}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <StatusBadge status={invoice.status} />
+            <span className="text-sm text-slate-500">{invoice.customer.displayName}</span>
+            {invoice.workOrder && (
+              <span className="badge bg-slate-100 text-slate-600">Work Order {invoice.workOrder.woNumber}</span>
+            )}
+            {invoice.isRecurring && <span className="badge bg-blue-100 text-blue-700">Recurring</span>}
+          </div>
+          {Object.values(paymentOptions).some(Boolean) && (
+            <p className="mt-1.5 text-xs text-slate-400">
+              Accepted payment methods:{' '}
+              {Object.entries(paymentOptions)
+                .filter(([, v]) => v)
+                .map(([k]) => paymentOptionLabels[k] ?? k)
+                .join(', ')}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {invoice.shareToken && <ShareLinkButton path={`/share/invoice/${invoice.shareToken}`} />}
+          <PrintButton />
+          <RecordPaymentForm
+            invoiceId={invoice.id}
+            balanceDue={Number(invoice.balanceDue)}
+            currency={currency}
+            allowedMethods={allowedMethods}
+          />
+        </div>
+      </div>
+
+      <div className="print-area">
+        <InvoiceDocument
+          settings={{
+            companyName: settings?.companyName ?? 'Ignite Safety',
+            companyAddress: settings?.companyAddress ?? null,
+            companyPhone: settings?.companyPhone ?? null,
+            companyEmail: settings?.companyEmail ?? null,
+            taxRegistrationNumber: settings?.taxRegistrationNumber ?? null,
+            logoUrl: settings?.logoUrl ?? null,
+            paymentInstructions: settings?.paymentInstructions ?? null,
+            bankName: settings?.bankName ?? null,
+            bankAccountName: settings?.bankAccountName ?? null,
+            bankAccountNumber: settings?.bankAccountNumber ?? null,
+          }}
+          documentNumber={invoice.invoiceNumber}
+          issueDate={invoice.issueDate.toLocaleDateString()}
+          dueDate={invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null}
+          terms={invoice.terms}
+          customer={{
+            displayName: invoice.customer.displayName,
+            address: invoice.customer.address,
+            phone: invoice.customer.phone,
+          }}
+          lineItems={invoice.lineItems.map((li) => ({
+            id: li.id,
+            sku: li.shopItem?.sku ?? null,
+            description: li.description,
+            quantity: li.quantity.toString(),
+            unitPrice: li.unitPrice.toString(),
+            discountPercent: li.discountPercent.toString(),
+            taxName: li.taxRate?.name ?? null,
+            lineTotal: li.lineTotal.toString(),
+          }))}
+          currency={currency}
+          subtotal={invoice.subtotal.toString()}
+          discountTotal={invoice.discountTotal.toString()}
+          globalDiscountPercent={invoice.globalDiscountPercent.toString()}
+          taxTotal={invoice.taxTotal.toString()}
+          total={invoice.total.toString()}
+          amountPaid={invoice.amountPaid.toString()}
+          balanceDue={invoice.balanceDue.toString()}
+          taxInclusive={invoice.taxInclusive}
+          customerMessage={invoice.customerMessage}
+        />
+      </div>
+
+      <AttachmentsPanel
+        entityType="Invoice"
+        entityId={invoice.id}
+        attachments={attachments.map((a) => ({
+          id: a.id,
+          fileName: a.fileName,
+          fileUrl: a.fileUrl,
+          fileSizeBytes: a.fileSizeBytes,
+          createdAt: a.createdAt.toISOString(),
+        }))}
+      />
+
+      {invoice.payments.length > 0 && (
+        <div className="card p-6 print:hidden">
+          <h2 className="mb-3 text-sm font-semibold text-ink-900">Payment History</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-slate-500">
+                <th className="py-2">Date</th>
+                <th className="py-2">Method</th>
+                <th className="py-2">Reference</th>
+                <th className="py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.payments.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100">
+                  <td className="py-2">{p.paidAt.toLocaleDateString()}</td>
+                  <td className="py-2">{p.method.replace('_', ' ')}</td>
+                  <td className="py-2 text-slate-500">{p.reference ?? '—'}</td>
+                  <td className="py-2 text-right font-medium">{formatMoney(p.amount.toString(), currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

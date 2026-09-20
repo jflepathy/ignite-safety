@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply text-ink-900;
+  }
+  body {
+    @apply bg-slate-50;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn bg-white border border-slate-300 text-ink-800 hover:bg-slate-50;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium text-slate-600;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  /* Row/item selection highlighting — used by any selectable table row or
+     list item across the app (Servicing Requests, Work Orders, catalog
+     pickers, etc). Apply `.row-selectable` to the row/item and toggle
+     `.is-selected` via React state. Defined here (rather than relying on
+     ad-hoc bg-* utility classes per component) so selection styling is
+     consistent and never silently fails to render because Tailwind purged
+     a class that was only ever built as a dynamic template string. */
+  .row-selectable {
+    @apply cursor-pointer transition-colors;
+  }
+  .row-selectable:hover {
+    @apply bg-slate-50;
+  }
+  .row-selectable.is-selected {
+    @apply bg-brand-50;
+    box-shadow: inset 3px 0 0 0 theme('colors.brand.600');
+  }
+  .row-selectable.is-selected:hover {
+    @apply bg-brand-100;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Document printing (Invoices, Estimates, Sales Receipts, Credit Notes,
+ * Refund Receipts, Work Orders, etc.)
+ *
+ * Root cause of the printing bug: window.print() was printing the entire
+ * app shell (sidebar nav, top header, buttons) around whatever content
+ * happened to be on screen, because nothing ever told the browser which
+ * part of the page IS the document and which part is just app chrome.
+ * `print:hidden` on individual buttons hid a few controls, but the sidebar
+ * <aside> and top <header> in the app shell were never marked, so they
+ * always printed too, and the "document" itself kept its on-screen card
+ * padding/shadow/max-width instead of laying out like a real page.
+ *
+ * Fix: any page that should print as a clean, standalone document wraps
+ * that content in a `.print-area` element. When printing, everything on
+ * the page is hidden except the nearest `.print-area` and its contents,
+ * which is repositioned to occupy the full page. This works globally,
+ * automatically, for every module — a new module gets working printing
+ * for free just by adding the class, no per-page CSS needed.
+ * ------------------------------------------------------------------------- */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Belt-and-suspenders: explicitly collapse the app shell even if a
+     future layout change moves content around and .print-area isn't an
+     ancestor of everything else on the page. */
+  .app-shell-chrome {
+    display: none !important;
+  }
+}

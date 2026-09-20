@@ -1,0 +1,1380 @@
+// ============================================================================
+// Ignite Safety — Prisma Schema
+// Fire safety & life-saving equipment servicing: invoicing/accounting +
+// servicing outreach/scheduling + digital work orders / technician POS.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled connection (Supabase pgbouncer, port 6543)
+  directUrl = env("DIRECT_URL") // direct connection, used for migrations
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  SALES
+  TECHNICIAN
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+  GOVERNMENT
+}
+
+enum EquipmentCategory {
+  FIRE_EXTINGUISHER
+  HOSE_REEL
+  SUPPRESSION_SYSTEM
+  FIRE_BLANKET
+  LIFE_RAFT
+  SMOKE_DETECTOR
+  EMERGENCY_LIGHT
+  FIRE_ALARM_PANEL
+  OTHER
+}
+
+enum ServiceType {
+  ONSITE
+  WORKSHOP
+}
+
+enum ServiceRequestStatus {
+  NEW
+  SCHEDULED
+  CONVERTED
+  CANCELLED
+}
+
+enum WorkOrderStatus {
+  PENDING
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  PAST_DUE
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CONVERTED
+}
+
+enum CreditNoteStatus {
+  DRAFT
+  ISSUED
+  APPLIED
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum PassFailStatus {
+  PASS
+  FAIL
+  NA
+}
+
+// --- Added for the QuickBooks-style expansion (Accounting, Purchasing,
+// Inventory, CRM, Time Tracking) ---------------------------------------
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum BillStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum SalesOrderStatus {
+  OPEN
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CLOSED
+  CANCELLED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum OpportunityStage {
+  PROSPECTING
+  QUALIFICATION
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum ItemType {
+  INVENTORY
+  NON_INVENTORY
+  SERVICE
+  BUNDLE
+}
+
+enum AccountingMethod {
+  ACCRUAL
+  CASH
+}
+
+enum PayType {
+  HOURLY
+  SALARY
+  MONTHLY
+}
+
+// ---------------------------------------------------------------------------
+// Users & Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(SALES)
+  phone        String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  createdServiceRequests ServiceRequest[] @relation("ServiceRequestCreatedBy")
+  assignedWorkOrders     WorkOrder[]      @relation("WorkOrderTechnician")
+  createdInvoices        Invoice[]        @relation("InvoiceCreatedBy")
+  createdEstimates       Estimate[]       @relation("EstimateCreatedBy")
+  recordedPayments       Payment[]        @relation("PaymentRecordedBy")
+  settingsUpdates        AppSettings[]    @relation("SettingsUpdatedBy")
+  auditLogs              AuditLog[]
+  permissionOverrides    UserPermissionOverride[]
+
+  @@map("users")
+}
+
+// Explicit per-staff-member feature-visibility overrides, layered on top of
+// the base 3-role system (Admin/Sales/Technician). moduleKey matches the
+// keys used in AppSettings.uiModules / nav-config (e.g. "accounting",
+// "expenses", "inventory"). When no override row exists for a user+module,
+// the role default (ROUTE_ACCESS in lib/roles.ts) applies unchanged.
+model UserPermissionOverride {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleKey  String
+  allowed    Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, moduleKey])
+  @@map("user_permission_overrides")
+}
+
+// One row per non-base currency, used by the Multi-Currency Engine. Rate is
+// expressed as 1 unit of currencyCode = rateToBase units of AppSettings.baseCurrency.
+model ExchangeRate {
+  id               String   @id @default(cuid())
+  currencyCode     String   @unique
+  rateToBase       Decimal  @db.Decimal(18, 6)
+  isManualOverride Boolean  @default(false)
+  locked           Boolean  @default(false) // when true, auto daily refresh skips this currency
+  source           String?  @default("manual") // "manual" or the FX provider name
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@map("exchange_rates")
+}
+
+// ---------------------------------------------------------------------------
+// Customers
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id            String       @id @default(cuid())
+  displayName   String
+  type          CustomerType @default(COMPANY)
+  contactPerson String?
+  phone         String?
+  altPhone      String?
+  email         String?
+  address       String?
+  region        String? // broad area, e.g. Mahe, Praslin, La Digue
+  district      String? // specific district within the region, e.g. Anse Etoile
+  taxId         String? // local VAT / business registration number
+  notes         String?
+  active        Boolean      @default(true)
+  deletedAt     DateTime? // soft delete -> Recycle Bin
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  sites           CustomerSite[]
+  equipment       Equipment[]
+  serviceRequests ServiceRequest[]
+  workOrders      WorkOrder[]
+  invoices        Invoice[]
+  estimates       Estimate[]
+  creditNotes     CreditNote[]
+  salesOrders     SalesOrder[]
+  salesReceipts   SalesReceipt[]
+  refundReceipts  RefundReceipt[]
+  opportunities   Opportunity[]
+
+  @@index([displayName])
+  @@map("customers")
+}
+
+model CustomerSite {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label        String // e.g. "Main Warehouse", "Head Office"
+  buildingName String?
+  address      String?
+  region       String?
+  district     String?
+  gpsLat       Float?
+  gpsLng       Float?
+  createdAt    DateTime @default(now())
+
+  equipment       Equipment[]
+  serviceRequests ServiceRequest[]
+  workOrders      WorkOrder[]
+
+  @@map("customer_sites")
+}
+
+// ---------------------------------------------------------------------------
+// Equipment & Pricing Catalog (Module D)
+// ---------------------------------------------------------------------------
+
+model EquipmentTypeCatalog {
+  id                    String            @id @default(cuid())
+  category              EquipmentCategory @unique
+  label                 String
+  defaultIntervalMonths Int               @default(12)
+  requiresHydrostatic   Boolean           @default(false)
+  active                Boolean           @default(true)
+
+  equipment         Equipment[]
+  requestLineCounts ServiceRequestEquipmentCount[]
+
+  @@map("equipment_type_catalog")
+}
+
+model Equipment {
+  id                  String                @id @default(cuid())
+  customerId          String
+  customer            Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  siteId              String?
+  site                CustomerSite?         @relation(fields: [siteId], references: [id])
+  category            EquipmentCategory
+  typeCatalogId       String?
+  typeCatalog         EquipmentTypeCatalog? @relation(fields: [typeCatalogId], references: [id])
+  serialNumber        String?
+  make                String?
+  model               String?
+  locationDescription String? // e.g. "Kitchen - near exit"
+  installDate         DateTime?
+  lastServiceDate     DateTime?
+  intervalMonths      Int                   @default(12)
+  status              String                @default("ACTIVE") // ACTIVE, DECOMMISSIONED
+  deletedAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  inspectionLogs WorkOrderInspectionItem[]
+
+  @@index([customerId])
+  @@index([category])
+  @@map("equipment")
+}
+
+model ShopItem {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String?
+  category    String? // e.g. "Extinguisher - 9kg DCP", "Service Charge - Onsite"
+  itemType    ItemType @default(NON_INVENTORY)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  cost        Decimal? @db.Decimal(12, 2) // unit cost, for margin reporting
+  taxable     Boolean  @default(true)
+  active      Boolean  @default(true)
+
+  // Inventory tracking (only meaningful when itemType = INVENTORY)
+  quantityOnHand Int? @default(0)
+  reorderPoint   Int?
+
+  // Chart-of-accounts mapping (QuickBooks-style item -> account posting)
+  incomeAccountId  String?
+  incomeAccount    Account? @relation("ItemIncomeAccount", fields: [incomeAccountId], references: [id])
+  expenseAccountId String?
+  expenseAccount   Account? @relation("ItemExpenseAccount", fields: [expenseAccountId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoiceLineItems     InvoiceLineItem[]
+  estimateLineItems    EstimateLineItem[]
+  creditNoteLines      CreditNoteLineItem[]
+  salesOrderLines      SalesOrderLineItem[]
+  salesReceiptLines    SalesReceiptLineItem[]
+  refundReceiptLines   RefundReceiptLineItem[]
+  purchaseOrderLines   PurchaseOrderLineItem[]
+  billLines            BillLineItem[]
+  inventoryAdjustments InventoryAdjustment[]
+
+  @@map("shop_items")
+}
+
+// ---------------------------------------------------------------------------
+// Chart of Accounts (Accounting)
+// ---------------------------------------------------------------------------
+
+model Account {
+  id          String      @id @default(cuid())
+  code        String?     @unique
+  name        String
+  type        AccountType
+  subtype     String? // e.g. "Bank", "Accounts Receivable", "Cost of Goods Sold"
+  description String?
+  isActive    Boolean     @default(true)
+  parentId    String?
+  parent      Account?    @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children    Account[]   @relation("AccountHierarchy")
+  createdAt   DateTime    @default(now())
+
+  itemsAsIncome  ShopItem[]        @relation("ItemIncomeAccount")
+  itemsAsExpense ShopItem[]        @relation("ItemExpenseAccount")
+  journalLines   JournalLine[]
+  bankAccount    BankAccount?
+  transfersFrom  AccountTransfer[] @relation("TransferFrom")
+  transfersTo    AccountTransfer[] @relation("TransferTo")
+  expenses       Expense[]
+
+  @@map("accounts")
+}
+
+// ---------------------------------------------------------------------------
+// Suppliers, Bills & Purchasing (Expenses & Pay Bills)
+// ---------------------------------------------------------------------------
+
+model Supplier {
+  id            String    @id @default(cuid())
+  displayName   String
+  companyName   String?
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  taxId         String?
+  notes         String?
+  active        Boolean   @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bills           Bill[]
+  purchaseOrders  PurchaseOrder[]
+  supplierCredits SupplierCredit[]
+  expenses        Expense[]
+
+  @@index([displayName])
+  @@map("suppliers")
+}
+
+model Bill {
+  id          String     @id @default(cuid())
+  billNumber  String     @unique // internal reference, e.g. BILL-2026-0012
+  supplierRef String? // the supplier's own invoice/bill number
+  supplierId  String
+  supplier    Supplier   @relation(fields: [supplierId], references: [id])
+  status      BillStatus @default(OPEN)
+  billDate    DateTime   @default(now())
+  dueDate     DateTime?
+  subtotal    Decimal    @default(0) @db.Decimal(12, 2)
+  taxTotal    Decimal    @default(0) @db.Decimal(12, 2)
+  total       Decimal    @default(0) @db.Decimal(12, 2)
+  amountPaid  Decimal    @default(0) @db.Decimal(12, 2)
+  balanceDue  Decimal    @default(0) @db.Decimal(12, 2)
+  terms       String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  lineItems     SupplierPayment[]
+  billLineItems BillLineItem[]
+
+  @@index([status])
+  @@map("bills")
+}
+
+model BillLineItem {
+  id          String    @id @default(cuid())
+  billId      String
+  bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  shopItemId  String?
+  shopItem    ShopItem? @relation(fields: [shopItemId], references: [id])
+  accountId   String? // expense account this line posts to
+  description String
+  quantity    Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal   @default(0) @db.Decimal(12, 2)
+  lineTotal   Decimal   @default(0) @db.Decimal(12, 2)
+
+  @@map("bill_line_items")
+}
+
+model SupplierPayment {
+  id          String        @id @default(cuid())
+  billId      String
+  bill        Bill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(12, 2)
+  method      PaymentMethod @default(BANK_TRANSFER)
+  reference   String?
+  paidAt      DateTime      @default(now())
+  createdById String?
+
+  @@map("supplier_payments")
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  poNumber     String              @unique
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  status       PurchaseOrderStatus @default(DRAFT)
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  subtotal     Decimal             @default(0) @db.Decimal(12, 2)
+  taxTotal     Decimal             @default(0) @db.Decimal(12, 2)
+  total        Decimal             @default(0) @db.Decimal(12, 2)
+  notes        String?
+  createdById  String?
+  createdAt    DateTime            @default(now())
+
+  lineItems PurchaseOrderLineItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLineItem {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  shopItemId       String?
+  shopItem         ShopItem?     @relation(fields: [shopItemId], references: [id])
+  description      String
+  quantity         Decimal       @default(1) @db.Decimal(10, 2)
+  quantityReceived Decimal       @default(0) @db.Decimal(10, 2)
+  unitPrice        Decimal       @default(0) @db.Decimal(12, 2)
+  lineTotal        Decimal       @default(0) @db.Decimal(12, 2)
+
+  @@map("purchase_order_line_items")
+}
+
+model SupplierCredit {
+  id           String   @id @default(cuid())
+  creditNumber String   @unique
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  billId       String?
+  issueDate    DateTime @default(now())
+  reason       String?
+  subtotal     Decimal  @default(0) @db.Decimal(12, 2)
+  taxTotal     Decimal  @default(0) @db.Decimal(12, 2)
+  total        Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+
+  @@map("supplier_credits")
+}
+
+// ---------------------------------------------------------------------------
+// Sales Orders, Sales Receipts & Refund Receipts (Sales & Get Paid extras)
+// ---------------------------------------------------------------------------
+
+model SalesOrder {
+  id                    String           @id @default(cuid())
+  orderNumber           String           @unique
+  customerId            String
+  customer              Customer         @relation(fields: [customerId], references: [id])
+  status                SalesOrderStatus @default(OPEN)
+  orderDate             DateTime         @default(now())
+  globalDiscountPercent Decimal          @default(0) @db.Decimal(5, 2)
+  subtotal              Decimal          @default(0) @db.Decimal(12, 2)
+  discountTotal         Decimal          @default(0) @db.Decimal(12, 2)
+  taxTotal              Decimal          @default(0) @db.Decimal(12, 2)
+  total                 Decimal          @default(0) @db.Decimal(12, 2)
+  notes                 String?
+  createdById           String?
+  createdAt             DateTime         @default(now())
+
+  lineItems SalesOrderLineItem[]
+
+  @@map("sales_orders")
+}
+
+model SalesOrderLineItem {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  shopItemId   String?
+  shopItem     ShopItem?  @relation(fields: [shopItemId], references: [id])
+  description  String
+  quantity     Decimal    @default(1) @db.Decimal(10, 2)
+  unitPrice    Decimal    @default(0) @db.Decimal(12, 2)
+  taxRateId    String?
+  taxRate      TaxRate?   @relation("SalesOrderLineTax", fields: [taxRateId], references: [id])
+  lineTotal    Decimal    @default(0) @db.Decimal(12, 2)
+  sortOrder    Int        @default(0)
+
+  @@map("sales_order_line_items")
+}
+
+model SalesReceipt {
+  id            String        @id @default(cuid())
+  receiptNumber String        @unique
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  saleDate      DateTime      @default(now())
+  paymentMethod PaymentMethod @default(CASH)
+  subtotal      Decimal       @default(0) @db.Decimal(12, 2)
+  taxTotal      Decimal       @default(0) @db.Decimal(12, 2)
+  total         Decimal       @default(0) @db.Decimal(12, 2)
+  notes         String?
+  createdById   String?
+  createdAt     DateTime      @default(now())
+
+  lineItems SalesReceiptLineItem[]
+
+  @@map("sales_receipts")
+}
+
+model SalesReceiptLineItem {
+  id             String       @id @default(cuid())
+  salesReceiptId String
+  salesReceipt   SalesReceipt @relation(fields: [salesReceiptId], references: [id], onDelete: Cascade)
+  shopItemId     String?
+  shopItem       ShopItem?    @relation(fields: [shopItemId], references: [id])
+  description    String
+  quantity       Decimal      @default(1) @db.Decimal(10, 2)
+  unitPrice      Decimal      @default(0) @db.Decimal(12, 2)
+  taxRateId      String?
+  taxRate        TaxRate?     @relation("SalesReceiptLineTax", fields: [taxRateId], references: [id])
+  lineTotal      Decimal      @default(0) @db.Decimal(12, 2)
+
+  @@map("sales_receipt_line_items")
+}
+
+model RefundReceipt {
+  id           String        @id @default(cuid())
+  refundNumber String        @unique
+  customerId   String
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  invoiceId    String?
+  refundDate   DateTime      @default(now())
+  method       PaymentMethod @default(CASH)
+  reason       String?
+  subtotal     Decimal       @default(0) @db.Decimal(12, 2)
+  taxTotal     Decimal       @default(0) @db.Decimal(12, 2)
+  total        Decimal       @default(0) @db.Decimal(12, 2)
+  createdById  String?
+  createdAt    DateTime      @default(now())
+
+  lineItems RefundReceiptLineItem[]
+
+  @@map("refund_receipts")
+}
+
+model RefundReceiptLineItem {
+  id              String        @id @default(cuid())
+  refundReceiptId String
+  refundReceipt   RefundReceipt @relation(fields: [refundReceiptId], references: [id], onDelete: Cascade)
+  shopItemId      String?
+  shopItem        ShopItem?     @relation(fields: [shopItemId], references: [id])
+  description     String
+  quantity        Decimal       @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal       @default(0) @db.Decimal(12, 2)
+  lineTotal       Decimal       @default(0) @db.Decimal(12, 2)
+
+  @@map("refund_receipt_line_items")
+}
+
+// ---------------------------------------------------------------------------
+// Customer Hub: Leads & Opportunities (CRM)
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id                  String     @id @default(cuid())
+  name                String
+  companyName         String?
+  phone               String?
+  email               String?
+  source              String? // e.g. "Referral", "Website", "Walk-in"
+  status              LeadStatus @default(NEW)
+  notes               String?
+  assignedToId        String?
+  convertedCustomerId String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  opportunities Opportunity[]
+
+  @@map("leads")
+}
+
+model Opportunity {
+  id                 String           @id @default(cuid())
+  name               String
+  customerId         String?
+  customer           Customer?        @relation(fields: [customerId], references: [id])
+  leadId             String?
+  lead               Lead?            @relation(fields: [leadId], references: [id])
+  stage              OpportunityStage @default(PROSPECTING)
+  estimatedValue     Decimal          @default(0) @db.Decimal(12, 2)
+  probabilityPercent Int              @default(50)
+  expectedCloseDate  DateTime?
+  notes              String?
+  assignedToId       String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@map("opportunities")
+}
+
+// ---------------------------------------------------------------------------
+// Team: Employees & Time Tracking
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id         String    @id @default(cuid())
+  userId     String?   @unique
+  name       String
+  email      String?
+  phone      String?
+  jobTitle   String?
+  department String?
+  hireDate   DateTime?
+  payType    PayType   @default(MONTHLY)
+  payRate    Decimal?  @db.Decimal(10, 2) // interpreted per payType: MONTHLY = amount/month (standard going forward)
+  standardHoursPerWeek Decimal?  @default(40) @db.Decimal(5, 2)
+  employmentType       String?   @default("Permanent") // Permanent, Contract, Part-Time, Probation
+  contractEndDate      DateTime? // for fixed-term / contract employment
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  timeActivities TimeActivity[]
+
+  @@map("employees")
+}
+
+model TimeActivity {
+  id                 String   @id @default(cuid())
+  employeeId         String
+  employee           Employee @relation(fields: [employeeId], references: [id])
+  workOrderId        String?
+  customerId         String?
+  date               DateTime @default(now())
+  hours              Decimal  @db.Decimal(5, 2)
+  billable           Boolean  @default(true)
+  serviceDescription String?
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  @@index([employeeId])
+  @@map("time_activities")
+}
+
+// ---------------------------------------------------------------------------
+// Banking & Journal (Accounting > Reconcile, Bank deposit, Transfer, Journal entry)
+// ---------------------------------------------------------------------------
+
+model BankAccount {
+  id                  String   @id @default(cuid())
+  accountId           String   @unique
+  account             Account  @relation(fields: [accountId], references: [id])
+  name                String
+  accountType         String   @default("CHECKING") // CHECKING, SAVINGS, CREDIT_CARD
+  accountNumberMasked String?
+  openingBalance      Decimal  @default(0) @db.Decimal(12, 2)
+  currentBalance      Decimal  @default(0) @db.Decimal(12, 2)
+  currencyCode        String   @default("SCR")
+  createdAt           DateTime @default(now())
+
+  transactions BankTransaction[]
+  deposits     Deposit[]
+
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id               String      @id @default(cuid())
+  bankAccountId    String
+  bankAccount      BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  date             DateTime    @default(now())
+  description      String
+  amount           Decimal     @db.Decimal(12, 2) // positive = money in, negative = money out
+  reconciled       Boolean     @default(false)
+  matchedInvoiceId String?
+  matchedBillId    String?
+  createdAt        DateTime    @default(now())
+
+  @@index([bankAccountId])
+  @@map("bank_transactions")
+}
+
+model Deposit {
+  id            String      @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  date          DateTime    @default(now())
+  amount        Decimal     @db.Decimal(12, 2)
+  memo          String?
+  paymentIds    Json? // ids of Payment rows grouped into this deposit
+  createdById   String?
+  createdAt     DateTime    @default(now())
+
+  @@map("deposits")
+}
+
+model AccountTransfer {
+  id            String   @id @default(cuid())
+  fromAccountId String
+  fromAccount   Account  @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccountId   String
+  toAccount     Account  @relation("TransferTo", fields: [toAccountId], references: [id])
+  amount        Decimal  @db.Decimal(12, 2)
+  date          DateTime @default(now())
+  memo          String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@map("account_transfers")
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  entryNumber String   @unique
+  date        DateTime @default(now())
+  memo        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  debit          Decimal      @default(0) @db.Decimal(12, 2)
+  credit         Decimal      @default(0) @db.Decimal(12, 2)
+  description    String?
+
+  @@map("journal_lines")
+}
+
+model InventoryAdjustment {
+  id             String   @id @default(cuid())
+  shopItemId     String
+  shopItem       ShopItem @relation(fields: [shopItemId], references: [id])
+  date           DateTime @default(now())
+  quantityChange Int // positive = add stock, negative = remove stock
+  reason         String?
+  memo           String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  @@map("inventory_adjustments")
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cutting: Attachments, Tags, Custom Fields, Recurring Transactions
+// ---------------------------------------------------------------------------
+
+model Attachment {
+  id            String   @id @default(cuid())
+  entityType    String // "Invoice", "Estimate", "Bill", "WorkOrder", ...
+  entityId      String
+  fileName      String
+  fileUrl       String
+  fileSizeBytes Int?
+  uploadedById  String?
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  color String @default("#64748b")
+
+  taggedEntities TaggedEntity[]
+
+  @@map("tags")
+}
+
+model TaggedEntity {
+  id         String @id @default(cuid())
+  tagId      String
+  tag        Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  entityType String
+  entityId   String
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("tagged_entities")
+}
+
+model CustomField {
+  id        String   @id @default(cuid())
+  name      String
+  appliesTo String // "Invoice", "Customer", "Estimate", ...
+  fieldType String   @default("TEXT") // TEXT, NUMBER, DATE, DROPDOWN
+  options   Json? // for DROPDOWN
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("custom_fields")
+}
+
+model RecurringTemplate {
+  id            String    @id @default(cuid())
+  name          String
+  documentType  String // "INVOICE" | "ESTIMATE" | "BILL"
+  frequency     String    @default("MONTHLY") // WEEKLY, MONTHLY, QUARTERLY, ANNUALLY
+  intervalCount Int       @default(1)
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  nextRunDate   DateTime
+  customerId    String?
+  templateData  Json // snapshot of line items / totals to recreate the document
+  active        Boolean   @default(true)
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  @@map("recurring_templates")
+}
+
+// ---------------------------------------------------------------------------
+// Servicing Outreach & Scheduling (Module B)
+// ---------------------------------------------------------------------------
+
+model ServiceRequest {
+  id                String               @id @default(cuid())
+  requestNumber     String               @unique // e.g. SR-2026-0142
+  customerId        String
+  customer          Customer             @relation(fields: [customerId], references: [id])
+  siteId            String?
+  site              CustomerSite?        @relation(fields: [siteId], references: [id])
+  serviceType       ServiceType          @default(ONSITE)
+  proposedDate      DateTime
+  region            String?
+  district          String?
+  locationDetails   String?
+  status            ServiceRequestStatus @default(NEW)
+  sourceEquipmentId String? // if generated from an overdue equipment record
+  notes             String?
+  createdById       String?
+  createdBy         User?                @relation("ServiceRequestCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  equipmentCounts ServiceRequestEquipmentCount[]
+  workOrder       WorkOrder?
+
+  @@index([proposedDate])
+  @@index([status])
+  @@map("service_requests")
+}
+
+model ServiceRequestEquipmentCount {
+  id               String                @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest        @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  category         EquipmentCategory
+  typeCatalogId    String?
+  typeCatalog      EquipmentTypeCatalog? @relation(fields: [typeCatalogId], references: [id])
+  tentativeCount   Int                   @default(0)
+
+  @@unique([serviceRequestId, category])
+  @@map("service_request_equipment_counts")
+}
+
+// Optional per-date override of the default daily team capacity.
+model DailyCapacityOverride {
+  id             String   @id @default(cuid())
+  date           DateTime @unique
+  teamsAvailable Int
+  note           String?
+
+  @@map("daily_capacity_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// Digital Work Orders & Technician POS (Module C)
+// ---------------------------------------------------------------------------
+
+model WorkOrder {
+  id                       String          @id @default(cuid())
+  woNumber                 String          @unique // e.g. WO-2026-388
+  customerId               String
+  customer                 Customer        @relation(fields: [customerId], references: [id])
+  siteId                   String?
+  site                     CustomerSite?   @relation(fields: [siteId], references: [id])
+  serviceRequestId         String?         @unique
+  serviceRequest           ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  serviceType              ServiceType     @default(ONSITE)
+  status                   WorkOrderStatus @default(PENDING)
+  scheduledDate            DateTime?
+  assignedTechnicianId     String?
+  assignedTechnician       User?           @relation("WorkOrderTechnician", fields: [assignedTechnicianId], references: [id])
+  region                   String?
+  locationDetails          String?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  customerSignedName       String?
+  customerSignatureDataUrl String? // base64 PNG captured on device
+  technicianNotes          String?
+  // Mobile POS cart: [{ key, label, quantity, kind: "STANDARD"|"CUSTOM"|"WORKSHOP" }, ...]
+  serviceLines             Json            @default("[]")
+  invoiceNumberIfIssued    String? // technician-entered, free text — the actual Invoice record (if any) is linked separately via invoiceId
+  invoiceId                String?         @unique
+  invoice                  Invoice?        @relation(fields: [invoiceId], references: [id])
+  deletedAt                DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  inspectionItems WorkOrderInspectionItem[]
+
+  @@index([status])
+  @@index([scheduledDate])
+  @@map("work_orders")
+}
+
+model WorkOrderInspectionItem {
+  id                  String            @id @default(cuid())
+  workOrderId         String
+  workOrder           WorkOrder         @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  equipmentId         String?
+  equipment           Equipment?        @relation(fields: [equipmentId], references: [id])
+  category            EquipmentCategory
+  serialNumber        String?
+  passFail            PassFailStatus    @default(NA)
+  replacementParts    String?
+  hydrostaticTestDone Boolean           @default(false)
+  hydrostaticNotes    String?
+  notes               String?
+  createdAt           DateTime          @default(now())
+
+  @@map("work_order_inspection_items")
+}
+
+// ---------------------------------------------------------------------------
+// Invoicing & Accounting (Module A)
+// ---------------------------------------------------------------------------
+
+model TaxRate {
+  id          String  @id @default(cuid())
+  name        String // e.g. "SCR VAT 15%"
+  ratePercent Decimal @db.Decimal(5, 2)
+  isDefault   Boolean @default(false)
+  active      Boolean @default(true)
+
+  invoiceLineItems  InvoiceLineItem[]
+  estimateLineItems EstimateLineItem[]
+  creditNoteLines   CreditNoteLineItem[]
+  salesOrderLines   SalesOrderLineItem[]   @relation("SalesOrderLineTax")
+  salesReceiptLines SalesReceiptLineItem[] @relation("SalesReceiptLineTax")
+
+  @@map("tax_rates")
+}
+
+model Invoice {
+  id                     String        @id @default(cuid())
+  invoiceNumber          String        @unique // e.g. INV-2026-0512
+  customerId             String
+  customer               Customer      @relation(fields: [customerId], references: [id])
+  status                 InvoiceStatus @default(DRAFT)
+  issueDate              DateTime      @default(now())
+  dueDate                DateTime?
+  globalDiscountPercent  Decimal       @default(0) @db.Decimal(5, 2)
+  subtotal               Decimal       @default(0) @db.Decimal(12, 2)
+  discountTotal          Decimal       @default(0) @db.Decimal(12, 2)
+  taxTotal               Decimal       @default(0) @db.Decimal(12, 2)
+  total                  Decimal       @default(0) @db.Decimal(12, 2)
+  amountPaid             Decimal       @default(0) @db.Decimal(12, 2)
+  balanceDue             Decimal       @default(0) @db.Decimal(12, 2)
+  terms                  String?
+  notes                  String? // internal notes
+  customerMessage        String? // custom message shown to the customer on the document
+  taxInclusive           Boolean       @default(false) // Exclusive (add tax on top) vs Inclusive (tax baked into unit price)
+  customerPaymentOptions Json? // e.g. {"card":true,"bankTransfer":true}
+  shareToken             String?       @unique // enables a direct, unauthenticated share link
+  isRecurring            Boolean       @default(false)
+  recurringTemplateId    String?
+  createdById            String?
+  createdBy              User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  deletedAt              DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  lineItems   InvoiceLineItem[]
+  payments    Payment[]
+  workOrder   WorkOrder?
+  creditNotes CreditNote[]
+  // Attachments use the generic polymorphic Attachment model
+  // (entityType: "Invoice", entityId: this.id) — queried separately.
+
+  @@index([status])
+  @@index([customerId])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id              String    @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  shopItemId      String?
+  shopItem        ShopItem? @relation(fields: [shopItemId], references: [id])
+  description     String
+  quantity        Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal   @default(0) @db.Decimal(12, 2)
+  discountPercent Decimal   @default(0) @db.Decimal(5, 2)
+  taxRateId       String?
+  taxRate         TaxRate?  @relation(fields: [taxRateId], references: [id])
+  lineTotal       Decimal   @default(0) @db.Decimal(12, 2)
+  sortOrder       Int       @default(0)
+
+  @@map("invoice_line_items")
+}
+
+model Estimate {
+  id                    String         @id @default(cuid())
+  estimateNumber        String         @unique // e.g. EST-2026-0088
+  customerId            String
+  customer              Customer       @relation(fields: [customerId], references: [id])
+  status                EstimateStatus @default(DRAFT)
+  issueDate             DateTime       @default(now())
+  expiryDate            DateTime?
+  globalDiscountPercent Decimal        @default(0) @db.Decimal(5, 2)
+  subtotal              Decimal        @default(0) @db.Decimal(12, 2)
+  discountTotal         Decimal        @default(0) @db.Decimal(12, 2)
+  taxTotal              Decimal        @default(0) @db.Decimal(12, 2)
+  total                 Decimal        @default(0) @db.Decimal(12, 2)
+  taxInclusive          Boolean        @default(false)
+  notes                 String?
+  customerMessage       String?
+  shareToken            String?        @unique
+  acceptedByName        String? // e-signature integration point: captured name on acceptance
+  acceptedAt            DateTime?
+  createdById           String?
+  createdBy             User?          @relation("EstimateCreatedBy", fields: [createdById], references: [id])
+  deletedAt             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  lineItems EstimateLineItem[]
+
+  @@map("estimates")
+}
+
+model EstimateLineItem {
+  id              String    @id @default(cuid())
+  estimateId      String
+  estimate        Estimate  @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  shopItemId      String?
+  shopItem        ShopItem? @relation(fields: [shopItemId], references: [id])
+  description     String
+  quantity        Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal   @default(0) @db.Decimal(12, 2)
+  discountPercent Decimal   @default(0) @db.Decimal(5, 2)
+  taxRateId       String?
+  taxRate         TaxRate?  @relation(fields: [taxRateId], references: [id])
+  lineTotal       Decimal   @default(0) @db.Decimal(12, 2)
+  sortOrder       Int       @default(0)
+
+  @@map("estimate_line_items")
+}
+
+model CreditNote {
+  id               String           @id @default(cuid())
+  creditNoteNumber String           @unique // e.g. CN-2026-0021
+  customerId       String
+  customer         Customer         @relation(fields: [customerId], references: [id])
+  invoiceId        String?
+  invoice          Invoice?         @relation(fields: [invoiceId], references: [id])
+  status           CreditNoteStatus @default(DRAFT)
+  issueDate        DateTime         @default(now())
+  reason           String?
+  subtotal         Decimal          @default(0) @db.Decimal(12, 2)
+  taxTotal         Decimal          @default(0) @db.Decimal(12, 2)
+  total            Decimal          @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  lineItems CreditNoteLineItem[]
+
+  @@map("credit_notes")
+}
+
+model CreditNoteLineItem {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  shopItemId   String?
+  shopItem     ShopItem?  @relation(fields: [shopItemId], references: [id])
+  description  String
+  quantity     Decimal    @default(1) @db.Decimal(10, 2)
+  unitPrice    Decimal    @default(0) @db.Decimal(12, 2)
+  taxRateId    String?
+  taxRate      TaxRate?   @relation(fields: [taxRateId], references: [id])
+  lineTotal    Decimal    @default(0) @db.Decimal(12, 2)
+
+  @@map("credit_note_line_items")
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Decimal       @db.Decimal(12, 2)
+  method       PaymentMethod @default(CASH)
+  reference    String?
+  paidAt       DateTime      @default(now())
+  notes        String?
+  recordedById String?
+  recordedBy   User?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Module D: Dynamic Admin Settings Matrix (no-code configuration, singleton)
+// ---------------------------------------------------------------------------
+
+model AppSettings {
+  id Int @id @default(1)
+
+  // ---- 1. Company & Account Settings -------------------------------------
+  companyName           String  @default("Ignite Safety")
+  legalName             String?
+  companyAddress        String?
+  companyPhone          String?
+  companyEmail          String?
+  taxRegistrationNumber String? // TIN (Seychelles Revenue Commission)
+  businessRegistrationNumber String? // BRN (Registrar of Companies)
+  registeredOwners       String? // partners/owners as on the Certificate of Registration
+  businessType          String? @default("Limited Company")
+  industry              String? @default("Fire & Life Safety Services")
+  currencyCode          String  @default("SCR")
+  logoUrl               String? // logo used on printed documents/forms (white background)
+  faviconUrl            String? // browser-tab icon (transparent background)
+  invoiceTermsDefault   String? @default("Payment due within 30 days.")
+  paymentInstructions   String? @default("1. Cash\n2. Credit / Debit Card\n3. Cheque\n4. Bank Transfer\n5. Approved PO") // printed on invoice/estimate/receipt footer
+  bankName              String?
+  bankAccountName       String?
+  bankAccountNumber     String?
+
+  // Usage limits (display-only guardrails, not hard-enforced)
+  chartOfAccountsLimit Int?
+  billableUserLimit    Int?
+  customKpiLimit       Int?
+
+  // Sales Settings
+  preferredPaymentTerms       String  @default("Due on receipt")
+  deliveryMethod              String  @default("Email")
+  customFieldsEnabled         Boolean @default(true)
+  transactionNumberingEnabled Boolean @default(true)
+  serviceDateEnabled          Boolean @default(false)
+  discountsEnabled            Boolean @default(true)
+  depositsOnSalesEnabled      Boolean @default(false)
+  tagsEnabled                 Boolean @default(true)
+  skuTrackingEnabled          Boolean @default(true)
+  priceRulesEnabled           Boolean @default(false)
+  inventoryReceivingEnabled   Boolean @default(true)
+
+  // Progress Invoicing
+  progressInvoicingEnabled Boolean @default(false)
+
+  // Messages & Reminders
+  defaultInvoiceEmailSubject  String? @default("Invoice {{invoiceNumber}} from {{companyName}}")
+  defaultInvoiceEmailBody     String? @default("Hi {{customerName}}, please find your invoice attached. Thank you for your business.")
+  autoPaymentRemindersEnabled Boolean @default(true)
+  reminderScheduleDays        Json    @default("[-3,0,7,14]")
+
+  // Customer Feedback & AI
+  dailyDigestEnabled        Boolean @default(false)
+  autoSurveyRequestsEnabled Boolean @default(false)
+
+  // Expenses Settings
+  expenseItemizationEnabled      Boolean @default(true)
+  expenseTaggingEnabled          Boolean @default(true)
+  billableExpenseTrackingEnabled Boolean @default(true)
+  defaultBillTermsDays           Int     @default(30)
+  purchaseOrdersEnabled          Boolean @default(true)
+
+  // Time Tracking
+  weekStartDay        String  @default("Monday")
+  timesheetFields     Json    @default("[\"service\",\"customer\",\"billable\"]")
+  billableTimeEnabled Boolean @default(true)
+
+  // Advanced & Financial Preferences
+  accountingMethod             AccountingMethod @default(ACCRUAL)
+  fiscalYearStartMonth         Int              @default(1)
+  taxYearStartMonth            Int              @default(1)
+  booksClosedDate              DateTime?
+  multiCurrencyEnabled         Boolean          @default(false)
+  baseCurrency                 String           @default("SCR")
+  fxAutoUpdateEnabled          Boolean          @default(true) // daily automatic exchange rate retrieval
+  fxRateLockEnabled            Boolean          @default(false) // when true, all rates are locked (manual only) regardless of per-rate locked flag
+  fxLastFetchedAt              DateTime?
+  autoPrefillFormsEnabled      Boolean          @default(true)
+  autoApplyBillPaymentsEnabled Boolean          @default(true)
+  projectTrackingEnabled       Boolean          @default(false)
+  numberFormat                 String           @default("#,##0.00")
+  warnOnDuplicateCheckNumber   Boolean          @default(true)
+  warnOnDuplicateBillNumber    Boolean          @default(true)
+
+  // ---- Numbering (transaction number formatting, per document type) ------
+  invoicePrefix         String @default("INV")
+  invoiceNextSeq        Int    @default(1)
+  estimatePrefix        String @default("EST")
+  estimateNextSeq       Int    @default(1)
+  creditNotePrefix      String @default("CN")
+  creditNoteNextSeq     Int    @default(1)
+  workOrderPrefix       String @default("WO")
+  workOrderNextSeq      Int    @default(1)
+  serviceRequestPrefix  String @default("SR")
+  serviceRequestNextSeq Int    @default(1)
+  salesOrderPrefix      String @default("SO")
+  salesOrderNextSeq     Int    @default(1)
+  salesReceiptPrefix    String @default("SRC")
+  salesReceiptNextSeq   Int    @default(1)
+  refundReceiptPrefix   String @default("RR")
+  refundReceiptNextSeq  Int    @default(1)
+  billPrefix            String @default("BILL")
+  billNextSeq           Int    @default(1)
+  purchaseOrderPrefix   String @default("PO")
+  purchaseOrderNextSeq  Int    @default(1)
+  supplierCreditPrefix  String @default("SC")
+  supplierCreditNextSeq Int    @default(1)
+  journalEntryPrefix    String @default("JE")
+  journalEntryNextSeq   Int    @default(1)
+  itemSkuPrefix         String @default("ITM")
+  itemSkuNextSeq        Int    @default(1)
+
+  // ---- 2. Scheduling & Dispatch Engine ------------------------------------
+  dailyTeamCapacity            Int     @default(3)
+  smartRemindersEnabled        Boolean @default(true)
+  overdueThresholdDays         Int     @default(30)
+  defaultServiceIntervalMonths Int     @default(12)
+  reminderLeadDays             Int     @default(45)
+
+  // ---- Tax & Financial Settings --------------------------------------------
+  defaultTaxRateId      String?
+  taxInclusivePricing   Boolean @default(false)
+  discountLimitPercent  Decimal @default(20) @db.Decimal(5, 2)
+  allowedPaymentMethods Json    @default("[\"CASH\",\"CARD\",\"BANK_TRANSFER\",\"CHEQUE\"]")
+
+  // ---- UI Customization Controls (sidebar module visibility toggles) ------
+  uiModules Json @default("{\"historicalData\":true,\"recycleBin\":true,\"reports\":true,\"outreach\":true,\"workOrders\":true,\"billing\":true,\"settings\":true,\"accounting\":true,\"expenses\":true,\"customerHub\":true,\"team\":true,\"inventory\":true,\"tax\":true,\"marketing\":true}")
+
+  updatedById String?
+  updatedBy   User?    @relation("SettingsUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// Simple operating-expense ledger, feeds the Income vs. Expense report.
+model Expense {
+  id          String        @id @default(cuid())
+  date        DateTime      @default(now())
+  category    String // e.g. "Vehicle Fuel", "Parts & Supplies", "Rent", "Salaries"
+  vendor      String? // free-text vendor name, kept for entries not mapped to a Supplier record
+  description String?
+  amount      Decimal       @db.Decimal(12, 2)
+  method      PaymentMethod @default(BANK_TRANSFER)
+  reference   String?
+  accountId   String? // Chart of Accounts record this expense posts against
+  account     Account?      @relation(fields: [accountId], references: [id])
+  supplierId  String? // optional mapping to an existing Supplier
+  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@index([date])
+  @@index([accountId])
+  @@map("expenses")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String // e.g. "INVOICE_CREATED", "SETTINGS_UPDATED"
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
