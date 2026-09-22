@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
 import CustomerCombobox from '@/components/shared/customer-combobox';
+import ItemCombobox from '@/components/shared/item-combobox';
 
 type Customer = { id: string; displayName: string };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
@@ -82,6 +83,14 @@ export default function EstimateForm({
       taxRateId: item.taxable ? defaultTaxRate?.id ?? null : null,
     });
   }
+  function addLine() {
+    setLines((p) => [...p, emptyLine()]);
+  }
+  // Selecting an item on the last line opens a fresh blank line beneath it.
+  function selectShopItem(idx: number, key: string, shopItemId: string) {
+    applyShopItem(key, shopItemId);
+    if (idx === lines.length - 1) addLine();
+  }
 
   async function submit(action: 'save' | 'print') {
     setSubmitting(action);
@@ -138,7 +147,7 @@ export default function EstimateForm({
       <div className="card p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
-          <button className="btn-secondary" type="button" onClick={() => setLines((p) => [...p, emptyLine()])}>
+          <button className="btn-secondary" type="button" onClick={addLine}>
             + Add line
           </button>
         </div>
@@ -157,18 +166,12 @@ export default function EstimateForm({
             {lines.map((line, idx) => (
               <tr key={line.key} className="border-t border-slate-100">
                 <td className="py-2 pr-2">
-                  <select
-                    className="input"
-                    value={line.shopItemId ?? ''}
-                    onChange={(e) => (e.target.value ? applyShopItem(line.key, e.target.value) : updateLine(line.key, { shopItemId: null }))}
-                  >
-                    <option value="">Custom</option>
-                    {shopItems.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.sku} — {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <ItemCombobox
+                    items={shopItems}
+                    value={line.shopItemId}
+                    onSelect={(item) => selectShopItem(idx, line.key, item.id)}
+                    onClear={() => updateLine(line.key, { shopItemId: null })}
+                  />
                 </td>
                 <td className="py-2 pr-2">
                   <input
