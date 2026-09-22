@@ -81,7 +81,7 @@ export default function InvoiceDocument({
   return (
     <div
       className="overflow-hidden rounded-xl border border-slate-200 bg-white text-ink-900 print:rounded-none print:border-0"
-      style={{ fontFamily: 'Arial, Helvetica, "Helvetica Neue", sans-serif' }}
+      style={{ fontFamily: '"Courier New", Courier, monospace' }}
     >
       {/* Company header band */}
       <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-slate-50/60 p-8 print:bg-white">
