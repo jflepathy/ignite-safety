@@ -60,7 +60,10 @@ export async function POST(req: NextRequest) {
 
   const requestNumber = await nextDocumentNumber('serviceRequestNextSeq', 'serviceRequestPrefix');
 
-  const serviceRequest = await prisma.serviceRequest.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdRequest = await prisma.serviceRequest.create({
     data: {
       requestNumber,
       customerId: data.customerId,
@@ -74,14 +77,27 @@ export async function POST(req: NextRequest) {
       sourceEquipmentId: data.sourceEquipmentId || null,
       status: availability.available ? 'NEW' : 'NEW',
       createdById: session!.user.id,
-      equipmentCounts: {
-        create: data.equipmentCounts
-          .filter((ec) => ec.tentativeCount > 0)
-          .map((ec) => ({ category: ec.category, tentativeCount: ec.tentativeCount })),
-      },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  const nonZeroCounts = data.equipmentCounts.filter((ec) => ec.tentativeCount > 0);
+  for (const ec of nonZeroCounts) {
+    await prisma.serviceRequestEquipmentCount.create({
+      data: {
+        serviceRequestId: createdRequest.id,
+        category: ec.category,
+        tentativeCount: ec.tentativeCount,
+      },
+    });
+  }
+
+  const serviceRequest = await prisma.serviceRequest.findUnique({
+    where: { id: createdRequest.id },
     include: { customer: true, equipmentCounts: true },
   });
 
-  return NextResponse.json({ serviceRequest, availability }, { status: 201 });
+  return NextResponse.json({ serviceRequest: serviceRequest ?? createdRequest, availability }, { status: 201 });
 }

@@ -44,7 +44,10 @@ export async function POST(req: NextRequest) {
 
   const billNumber = await nextDocumentNumber('billNextSeq', 'billPrefix');
 
-  const bill = await prisma.bill.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdBill = await prisma.bill.create({
     data: {
       billNumber,
       supplierId: data.supplierId,
@@ -56,19 +59,31 @@ export async function POST(req: NextRequest) {
       taxTotal: 0,
       total: subtotal,
       balanceDue: subtotal,
-      billLineItems: {
-        create: data.lineItems.map((l, idx) => ({
-          description: l.description,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          accountId: l.accountId || null,
-          shopItemId: l.shopItemId || null,
-          lineTotal: lineTotals[idx],
-        })),
-      },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (let idx = 0; idx < data.lineItems.length; idx++) {
+    const l = data.lineItems[idx];
+    await prisma.billLineItem.create({
+      data: {
+        billId: createdBill.id,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        accountId: l.accountId || null,
+        shopItemId: l.shopItemId || null,
+        lineTotal: lineTotals[idx],
+      },
+    });
+  }
+
+  const bill = await prisma.bill.findUnique({
+    where: { id: createdBill.id },
     include: { supplier: true, billLineItems: true },
   });
 
-  return NextResponse.json(bill, { status: 201 });
+  return NextResponse.json(bill ?? createdBill, { status: 201 });
 }

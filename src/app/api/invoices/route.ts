@@ -109,7 +109,12 @@ export async function POST(req: NextRequest) {
     recurringTemplateId = template.id;
   }
 
-  const invoice = await prisma.invoice.create({
+  // Created in two steps rather than a single nested `create` — the Neon
+  // HTTP driver adapter (see architecture notes) can't run the implicit
+  // transaction Prisma normally wraps a parent+nested-children write in
+  // ("Transactions are not supported in HTTP mode"). `createMany` on the
+  // child table is a single plain INSERT, so it works fine without one.
+  const createdInvoice = await prisma.invoice.create({
     data: {
       invoiceNumber,
       customerId: data.customerId,
@@ -131,22 +136,35 @@ export async function POST(req: NextRequest) {
       isRecurring: data.isRecurring,
       recurringTemplateId,
       createdById: session!.user.id,
-      lineItems: {
-        create: data.lineItems.map((li, idx) => ({
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          discountPercent: li.discountPercent,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-          sortOrder: idx,
-        })),
-      },
       ...(data.workOrderId
         ? { workOrder: { connect: { id: data.workOrderId } } }
         : {}),
     },
+  });
+
+  // createMany() ALSO goes through the same implicit-transaction path as
+  // nested writes under the Neon HTTP adapter (confirmed by direct testing
+  // — it's not just nested `create`), so line items are inserted one at a
+  // time instead.
+  for (let idx = 0; idx < data.lineItems.length; idx++) {
+    const li = data.lineItems[idx];
+    await prisma.invoiceLineItem.create({
+      data: {
+        invoiceId: createdInvoice.id,
+        shopItemId: li.shopItemId || null,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        discountPercent: li.discountPercent,
+        taxRateId: li.taxRateId || null,
+        lineTotal: totals.lines[idx].lineTotal,
+        sortOrder: idx,
+      },
+    });
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: createdInvoice.id },
     include: { lineItems: true, customer: true },
   });
 
@@ -155,10 +173,10 @@ export async function POST(req: NextRequest) {
       userId: session!.user.id,
       action: 'INVOICE_CREATED',
       entityType: 'Invoice',
-      entityId: invoice.id,
-      metadata: { invoiceNumber: invoice.invoiceNumber, total: totals.total },
+      entityId: createdInvoice.id,
+      metadata: { invoiceNumber: createdInvoice.invoiceNumber, total: totals.total },
     },
   });
 
-  return NextResponse.json(invoice, { status: 201 });
+  return NextResponse.json(invoice ?? createdInvoice, { status: 201 });
 }

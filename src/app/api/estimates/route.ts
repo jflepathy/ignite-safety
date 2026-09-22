@@ -46,7 +46,10 @@ export async function POST(req: NextRequest) {
   const totals = computeDocumentTotals(data.lineItems, data.globalDiscountPercent);
   const estimateNumber = await nextDocumentNumber('estimateNextSeq', 'estimatePrefix');
 
-  const estimate = await prisma.estimate.create({
+  // Two-step create — see the same note in src/app/api/invoices/route.ts:
+  // the Neon HTTP adapter can't run the implicit transaction a nested
+  // relational `create` normally needs.
+  const createdEstimate = await prisma.estimate.create({
     data: {
       estimateNumber,
       customerId: data.customerId,
@@ -58,21 +61,33 @@ export async function POST(req: NextRequest) {
       total: totals.total,
       notes: data.notes,
       createdById: session!.user.id,
-      lineItems: {
-        create: data.lineItems.map((li, idx) => ({
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          discountPercent: li.discountPercent,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-          sortOrder: idx,
-        })),
-      },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (let idx = 0; idx < data.lineItems.length; idx++) {
+    const li = data.lineItems[idx];
+    await prisma.estimateLineItem.create({
+      data: {
+        estimateId: createdEstimate.id,
+        shopItemId: li.shopItemId || null,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        discountPercent: li.discountPercent,
+        taxRateId: li.taxRateId || null,
+        lineTotal: totals.lines[idx].lineTotal,
+        sortOrder: idx,
+      },
+    });
+  }
+
+  const estimate = await prisma.estimate.findUnique({
+    where: { id: createdEstimate.id },
     include: { lineItems: true, customer: true },
   });
 
-  return NextResponse.json(estimate, { status: 201 });
+  return NextResponse.json(estimate ?? createdEstimate, { status: 201 });
 }

@@ -64,20 +64,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.globalDiscountPercent ?? Number(existing.globalDiscountPercent)
     );
     const amountPaid = existing.payments.reduce((s, p) => s + Number(p.amount), 0);
+    // createMany() requires a transaction under the Neon HTTP adapter, same
+    // as nested `create` — see the note in src/app/api/invoices/route.ts.
+    // Rows go in one at a time instead.
     await prisma.invoiceLineItem.deleteMany({ where: { invoiceId: params.id } });
-    await prisma.invoiceLineItem.createMany({
-      data: data.lineItems.map((li, idx) => ({
-        invoiceId: params.id,
-        shopItemId: li.shopItemId || null,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        discountPercent: li.discountPercent,
-        taxRateId: li.taxRateId || null,
-        lineTotal: totals.lines[idx].lineTotal,
-        sortOrder: idx,
-      })),
-    });
+    for (let idx = 0; idx < data.lineItems.length; idx++) {
+      const li = data.lineItems[idx];
+      await prisma.invoiceLineItem.create({
+        data: {
+          invoiceId: params.id,
+          shopItemId: li.shopItemId || null,
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          discountPercent: li.discountPercent,
+          taxRateId: li.taxRateId || null,
+          lineTotal: totals.lines[idx].lineTotal,
+          sortOrder: idx,
+        },
+      });
+    }
     totalsPatch = {
       subtotal: totals.subtotal,
       discountTotal: totals.discountTotal,

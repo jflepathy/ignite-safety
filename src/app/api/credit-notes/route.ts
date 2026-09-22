@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
   const totals = computeDocumentTotals(data.lineItems, 0);
   const creditNoteNumber = await nextDocumentNumber('creditNoteNextSeq', 'creditNotePrefix');
 
-  const note = await prisma.creditNote.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdNote = await prisma.creditNote.create({
     data: {
       creditNoteNumber,
       customerId: data.customerId,
@@ -53,20 +56,31 @@ export async function POST(req: NextRequest) {
       subtotal: totals.subtotal,
       taxTotal: totals.taxTotal,
       total: totals.total,
-      lineItems: {
-        create: data.lineItems.map((li) => ({
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          taxRateId: li.taxRateId || null,
-          lineTotal:
-            totals.lines[data.lineItems.indexOf(li)]?.lineTotal ?? li.quantity * li.unitPrice,
-        })),
-      },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (let idx = 0; idx < data.lineItems.length; idx++) {
+    const li = data.lineItems[idx];
+    await prisma.creditNoteLineItem.create({
+      data: {
+        creditNoteId: createdNote.id,
+        shopItemId: li.shopItemId || null,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        taxRateId: li.taxRateId || null,
+        lineTotal: totals.lines[idx]?.lineTotal ?? li.quantity * li.unitPrice,
+      },
+    });
+  }
+
+  const note = await prisma.creditNote.findUnique({
+    where: { id: createdNote.id },
     include: { lineItems: true, customer: true },
   });
 
-  return NextResponse.json(note, { status: 201 });
+  return NextResponse.json(note ?? createdNote, { status: 201 });
 }

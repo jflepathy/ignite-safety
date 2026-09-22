@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
   const totals = computeDocumentTotals(data.lineItems, data.globalDiscountPercent);
   const orderNumber = await nextDocumentNumber('salesOrderNextSeq', 'salesOrderPrefix');
 
-  const order = await prisma.salesOrder.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdOrder = await prisma.salesOrder.create({
     data: {
       orderNumber,
       customerId: data.customerId,
@@ -52,19 +55,31 @@ export async function POST(req: NextRequest) {
       total: totals.total,
       notes: data.notes,
       createdById: session!.user.id,
-      lineItems: {
-        create: data.lineItems.map((li, idx) => ({
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-          sortOrder: idx,
-        })),
-      },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (let idx = 0; idx < data.lineItems.length; idx++) {
+    const li = data.lineItems[idx];
+    await prisma.salesOrderLineItem.create({
+      data: {
+        salesOrderId: createdOrder.id,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        taxRateId: li.taxRateId || null,
+        lineTotal: totals.lines[idx].lineTotal,
+        sortOrder: idx,
+      },
+    });
+  }
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id: createdOrder.id },
     include: { lineItems: true, customer: true },
   });
 
-  return NextResponse.json(order, { status: 201 });
+  return NextResponse.json(order ?? createdOrder, { status: 201 });
 }

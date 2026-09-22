@@ -21,7 +21,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const invoiceNumber = await nextDocumentNumber('invoiceNextSeq', 'invoicePrefix');
 
-  const invoice = await prisma.invoice.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdInvoice = await prisma.invoice.create({
     data: {
       invoiceNumber,
       customerId: estimate.customerId,
@@ -34,23 +37,34 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       balanceDue: estimate.total,
       notes: `Converted from estimate ${estimate.estimateNumber}`,
       createdById: session!.user.id,
-      lineItems: {
-        create: estimate.lineItems.map((li) => ({
-          shopItemId: li.shopItemId,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          discountPercent: li.discountPercent,
-          taxRateId: li.taxRateId,
-          lineTotal: li.lineTotal,
-          sortOrder: li.sortOrder,
-        })),
-      },
     },
-    include: { lineItems: true, customer: true },
   });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (const li of estimate.lineItems) {
+    await prisma.invoiceLineItem.create({
+      data: {
+        invoiceId: createdInvoice.id,
+        shopItemId: li.shopItemId,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        discountPercent: li.discountPercent,
+        taxRateId: li.taxRateId,
+        lineTotal: li.lineTotal,
+        sortOrder: li.sortOrder,
+      },
+    });
+  }
 
   await prisma.estimate.update({ where: { id: params.id }, data: { status: 'CONVERTED' } });
 
-  return NextResponse.json(invoice, { status: 201 });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: createdInvoice.id },
+    include: { lineItems: true, customer: true },
+  });
+
+  return NextResponse.json(invoice ?? createdInvoice, { status: 201 });
 }

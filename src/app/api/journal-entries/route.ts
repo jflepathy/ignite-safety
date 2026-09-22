@@ -46,16 +46,29 @@ export async function POST(req: NextRequest) {
 
   const entryNumber = await nextDocumentNumber('journalEntryNextSeq', 'journalEntryPrefix');
 
-  const entry = await prisma.journalEntry.create({
+  // Two-step create — the Neon HTTP adapter can't run the implicit
+  // transaction a nested relational `create` normally needs (see the same
+  // note in src/app/api/invoices/route.ts).
+  const createdEntry = await prisma.journalEntry.create({
     data: {
       entryNumber,
       memo: data.memo,
       date: data.date ? new Date(data.date) : new Date(),
       createdById: session!.user.id,
-      lines: { create: data.lines },
     },
+  });
+
+  // createMany() also requires a transaction under the Neon HTTP adapter
+  // (confirmed by direct testing — not just nested `create`), so rows go
+  // in one at a time.
+  for (const l of data.lines) {
+    await prisma.journalLine.create({ data: { ...l, journalEntryId: createdEntry.id } });
+  }
+
+  const entry = await prisma.journalEntry.findUnique({
+    where: { id: createdEntry.id },
     include: { lines: { include: { account: true } } },
   });
 
-  return NextResponse.json(entry, { status: 201 });
+  return NextResponse.json(entry ?? createdEntry, { status: 201 });
 }
