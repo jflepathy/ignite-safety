@@ -124,10 +124,23 @@ export default function SimpleDocForm({
     return { computed, subtotal, tax, total: subtotal + tax };
   }, [lines, taxRates]);
 
+  // Same rule as InvoiceForm/EstimateForm: a line the user never touched (no
+  // item picked, nothing typed) shouldn't block Save — most commonly the
+  // auto-added blank line beneath a just-picked item, left unfilled.
+  function isBlankLine(l: Line) {
+    return !l.shopItemId && l.description.trim() === '';
+  }
+
   async function submit(action: 'save' | 'print' = 'save') {
     setSubmitting(action);
     setError('');
     try {
+      const filledLines = lines.filter((l) => !isBlankLine(l));
+      if (filledLines.length === 0) {
+        setError('Add at least one line item before saving.');
+        setSubmitting(null);
+        return;
+      }
       const isEdit = mode === 'edit';
       const extra = buildExtraPayload ? buildExtraPayload(extraValues) : extraValues;
       const res = await fetch(isEdit ? `${apiUrl}/${recordId}` : apiUrl, {
@@ -135,7 +148,7 @@ export default function SimpleDocForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...extra,
-          lineItems: lines.map((l) => ({
+          lineItems: filledLines.map((l) => ({
             description: l.description,
             quantity: l.quantity,
             unitPrice: l.unitPrice,

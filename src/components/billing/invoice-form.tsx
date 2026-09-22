@@ -178,11 +178,24 @@ export default function InvoiceForm({
     );
   }, [lines, globalDiscountPercent, taxRates, taxInclusive]);
 
+  // A line the user never touched — no item picked, nothing typed, still at
+  // the default qty/price — shouldn't count as a "filled" line just because
+  // it exists in the array (the auto-added line beneath a just-picked item
+  // is the common case). Drop these before building the save payload so an
+  // untouched trailing line never blocks Save with a validation error.
+  function isBlankLine(l: Line) {
+    return !l.shopItemId && l.description.trim() === '';
+  }
+
   async function handleSubmit(asStatus: 'DRAFT' | 'SENT' | 'EDIT') {
     setSubmitting(asStatus);
     setErrorMsg('');
     try {
-      const lineItems = lines.map((l) => ({
+      const filledLines = lines.filter((l) => !isBlankLine(l));
+      if (filledLines.length === 0) {
+        throw new Error('Add at least one line item before saving.');
+      }
+      const lineItems = filledLines.map((l) => ({
         shopItemId: l.shopItemId,
         description: l.description,
         quantity: l.quantity,

@@ -92,10 +92,21 @@ export default function EstimateForm({
     if (idx === lines.length - 1) addLine();
   }
 
+  // Same rule as InvoiceForm: an untouched line (no item, nothing typed)
+  // shouldn't block Save just because the auto-added blank line beneath a
+  // just-picked item was never filled in.
+  function isBlankLine(l: Line) {
+    return !l.shopItemId && l.description.trim() === '';
+  }
+
   async function submit(action: 'save' | 'print') {
     setSubmitting(action);
     setError('');
     try {
+      const filledLines = lines.filter((l) => !isBlankLine(l));
+      if (filledLines.length === 0) {
+        throw new Error('Add at least one line item before saving.');
+      }
       const res = await fetch('/api/estimates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +114,7 @@ export default function EstimateForm({
           customerId,
           expiryDate: expiryDate || undefined,
           notes,
-          lineItems: lines.map((l) => ({
+          lineItems: filledLines.map((l) => ({
             shopItemId: l.shopItemId,
             description: l.description,
             quantity: l.quantity,

@@ -34,6 +34,15 @@ export async function POST(req: NextRequest) {
   const { session, error } = await requireRole('ADMIN', 'SALES');
   if (error) return error;
   const body = await req.json();
+  // A line item with no shop item picked and no description typed is an
+  // untouched blank row (most commonly the auto-added line beneath a
+  // just-picked item) — drop it before validation instead of failing the
+  // whole save on "String must contain at least 1 character(s)".
+  if (Array.isArray((body as any)?.lineItems)) {
+    (body as any).lineItems = (body as any).lineItems.filter(
+      (l: any) => (l?.description ?? '').trim() !== '' || !!l?.shopItemId
+    );
+  }
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
