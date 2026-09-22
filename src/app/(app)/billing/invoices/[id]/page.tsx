@@ -11,6 +11,7 @@ import AttachmentsPanel from '@/components/shared/attachments-panel';
 import InvoiceDocument from '@/components/billing/invoice-document';
 import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
+import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts] = await Promise.all([
@@ -67,6 +68,9 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           <Link href={`/billing/invoices/${invoice.id}/edit`} className="btn-secondary">
             Edit
           </Link>
+          {invoice.status === 'DRAFT' && (
+            <MarkAsSentButton invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+          )}
           <PrintButton />
           <DownloadPdfButton targetId="pdf-document" fileName={invoice.invoiceNumber} />
           <RecordPaymentForm
