@@ -12,7 +12,7 @@ function csvEscape(value: unknown): string {
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
   if (error) return error;
-  const items = await prisma.shopItem.findMany({ orderBy: { name: 'asc' } });
+  const items = await prisma.shopItem.findMany({ orderBy: { sku: 'asc' } });
 
   const lines = [COLUMNS.join(',')];
   for (const item of items) {

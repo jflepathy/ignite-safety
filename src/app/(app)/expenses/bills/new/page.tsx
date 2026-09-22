@@ -4,7 +4,7 @@ import BillFormClient from '@/components/expenses/bill-form-client';
 export default async function NewBillPage() {
   const [suppliers, shopItems, settings] = await Promise.all([
     prisma.supplier.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
-    prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
 

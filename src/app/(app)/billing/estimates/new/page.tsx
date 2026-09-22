@@ -4,7 +4,7 @@ import EstimateForm from '@/components/billing/estimate-form';
 export default async function NewEstimatePage() {
   const [customers, shopItems, taxRates, settings] = await Promise.all([
     prisma.customer.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
-    prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.taxRate.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);

@@ -4,7 +4,7 @@ import PurchaseOrderFormClient from '@/components/expenses/purchase-order-form-c
 export default async function NewPurchaseOrderPage() {
   const [suppliers, shopItems, settings] = await Promise.all([
     prisma.supplier.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
-    prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
 

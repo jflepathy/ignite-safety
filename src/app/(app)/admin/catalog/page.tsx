@@ -6,7 +6,7 @@ import ShopItemsManager from '@/components/admin/shop-items-manager';
 
 export default async function CatalogPage() {
   const [shopItems, settings, session] = await Promise.all([
-    prisma.shopItem.findMany({ orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     getServerSession(authOptions),
   ]);

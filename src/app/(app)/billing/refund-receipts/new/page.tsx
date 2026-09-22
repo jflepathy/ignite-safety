@@ -4,7 +4,7 @@ import RefundReceiptFormClient from '@/components/billing/refund-receipt-form-cl
 export default async function NewRefundReceiptPage() {
   const [customers, shopItems, settings] = await Promise.all([
     prisma.customer.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
-    prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
 

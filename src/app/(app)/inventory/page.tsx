@@ -4,7 +4,7 @@ import { formatMoney } from '@/lib/money';
 
 export default async function InventoryPage() {
   const [items, settings] = await Promise.all([
-    prisma.shopItem.findMany({ orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';

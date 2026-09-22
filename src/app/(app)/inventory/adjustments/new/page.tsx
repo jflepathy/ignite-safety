@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import InventoryAdjustmentForm from '@/components/inventory/inventory-adjustment-form';
 
 export default async function NewInventoryAdjustmentPage() {
-  const items = await prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+  const items = await prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } });
 
   return (
     <div className="space-y-6">

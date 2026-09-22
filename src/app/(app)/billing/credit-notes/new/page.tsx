@@ -4,7 +4,7 @@ import CreditNoteFormClient from '@/components/billing/credit-note-form-client';
 export default async function NewCreditNotePage({ searchParams }: { searchParams: { invoiceId?: string } }) {
   const [customers, shopItems, taxRates, settings, invoice] = await Promise.all([
     prisma.customer.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
-    prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.taxRate.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     searchParams.invoiceId ? prisma.invoice.findUnique({ where: { id: searchParams.invoiceId } }) : null,

@@ -6,7 +6,7 @@ import { z } from 'zod';
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES', 'TECHNICIAN');
   if (error) return error;
-  const items = await prisma.shopItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+  const items = await prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } });
   return NextResponse.json(items);
 }
 
