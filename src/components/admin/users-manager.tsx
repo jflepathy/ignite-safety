@@ -8,7 +8,7 @@ type User = {
   id: string;
   name: string;
   username: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   role: string;
   active: boolean;
@@ -115,7 +115,7 @@ export default function UsersManager({ users, unlinkedEmployees = [] }: { users:
               <tr key={u.id} className="border-t border-slate-100">
                 <td className="py-2">{u.name}</td>
                 <td className="py-2 text-slate-500">{u.username}</td>
-                <td className="py-2 text-slate-500">{u.email}</td>
+                <td className="py-2 text-slate-500">{u.email ?? '—'}</td>
                 <td className="py-2">
                   <span className="badge bg-slate-100 text-slate-700">{u.role}</span>
                 </td>
@@ -141,14 +141,14 @@ export default function UsersManager({ users, unlinkedEmployees = [] }: { users:
                     initialValues={{
                       name: u.name,
                       username: u.username,
-                      email: u.email,
+                      email: u.email ?? '',
                       role: u.role,
                       password: '',
                     }}
                     fields={[
                       { key: 'name', label: 'Name', required: true },
                       { key: 'username', label: 'Username (used to sign in)', required: true },
-                      { key: 'email', label: 'Email', required: true },
+                      { key: 'email', label: 'Email (optional)' },
                       { key: 'role', label: 'Role', type: 'select', options: ROLE_OPTIONS },
                       { key: 'password', label: 'Reset Password', type: 'password' },
                     ]}
@@ -179,7 +179,7 @@ export default function UsersManager({ users, unlinkedEmployees = [] }: { users:
         </select>
         <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input className="input" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-        <input className="input" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input className="input" placeholder="Email (optional)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <input
           className="input"
           placeholder="Password"

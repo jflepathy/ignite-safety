@@ -195,7 +195,7 @@ model User {
   id           String   @id @default(cuid())
   name         String
   username     String   @unique // login identifier as of Session 7 — email is kept for records/contact only, no longer used to sign in
-  email        String   @unique
+  email        String?  @unique // optional as of Session 15 — a login (e.g. a non-person "Admin Ops" assignment account) doesn't require one; still unique when provided
   passwordHash String
   role         UserRole @default(SALES)
   phone        String?

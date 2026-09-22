@@ -9,7 +9,8 @@ const usernamePattern = /^[a-z0-9._-]{3,32}$/;
 const UpdateSchema = z.object({
   name: z.string().min(1).optional(),
   username: z.string().regex(usernamePattern, 'Lowercase letters, numbers, dots, underscores or hyphens, 3-32 characters').optional(),
-  email: z.string().email().optional(),
+  // Optional (Session 15) — an empty string clears it back to no email.
+  email: z.string().trim().email().optional().or(z.literal('')),
   role: z.enum(['ADMIN', 'SALES', 'TECHNICIAN']).optional(),
   active: z.boolean().optional(),
   phone: z.string().optional().nullable(),
@@ -34,7 +35,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     data.username = lower;
   }
-  if (email !== undefined) data.email = email.toLowerCase();
+  if (email !== undefined) {
+    const normalized = email ? email.toLowerCase() : null;
+    if (normalized) {
+      const existingEmail = await prisma.user.findUnique({ where: { email: normalized } });
+      if (existingEmail && existingEmail.id !== params.id) {
+        return NextResponse.json({ error: { formErrors: ['That email is already in use by another login.'] } }, { status: 400 });
+      }
+    }
+    data.email = normalized;
+  }
   if (password) data.passwordHash = await bcrypt.hash(password, 10);
   if (unlock) {
     data.failedLoginAttempts = 0;

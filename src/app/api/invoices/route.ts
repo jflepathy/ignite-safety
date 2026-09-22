@@ -163,9 +163,12 @@ export async function POST(req: NextRequest) {
   });
 
   if (data.workOrderId) {
+    // Also stamps the invoice number onto the Work Order itself
+    // (`invoiceNumberIfIssued`) so it shows up right on the WO without
+    // having to open the linked invoice (Session 15).
     await prisma.workOrder.update({
       where: { id: data.workOrderId },
-      data: { invoiceId: createdInvoice.id },
+      data: { invoiceId: createdInvoice.id, invoiceNumberIfIssued: invoiceNumber },
     });
   }
 
