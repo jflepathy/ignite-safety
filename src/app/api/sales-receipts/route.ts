@@ -41,7 +41,11 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   const totals = computeDocumentTotals(data.lineItems, 0);
-  const receiptNumber = await nextDocumentNumber('salesReceiptNextSeq', 'salesReceiptPrefix');
+  // Sales Receipts share the Invoice numbering counter (QuickBooks-style
+  // combined sales-form numbering, per the 22 Sep 2026 QuickBooks migration
+  // — see nextDocumentNumber() and the Session 9 project notes). This is
+  // deliberate: 'invoiceNextSeq'/'invoicePrefix' is not a typo.
+  const receiptNumber = await nextDocumentNumber('invoiceNextSeq', 'invoicePrefix');
 
   // Two-step create — the Neon HTTP adapter can't run the implicit
   // transaction a nested relational `create` normally needs (see the same

@@ -76,7 +76,10 @@ export async function nextDocumentNumber(
   const year = new Date().getFullYear();
   const settings = await reserveNextSeq(seqField, prefixField);
   const padded = String(settings.seq).padStart(4, '0');
-  return `${settings.prefix}-${year}-${padded}`;
+  // An empty prefix (admin-configurable) yields a bare "{year}-{seq}" form,
+  // matching QuickBooks' own numbering style (no letter prefix) — used for
+  // Invoice/Sales Receipt/Estimate since the 22 Sep 2026 QuickBooks migration.
+  return settings.prefix ? `${settings.prefix}-${year}-${padded}` : `${year}-${padded}`;
 }
 
 /** Same atomic-reservation pattern as nextDocumentNumber(), but for
