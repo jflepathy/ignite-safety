@@ -66,22 +66,22 @@ async function main() {
   const admin = await findOrCreate(
     prisma.user,
     { email: 'admin@ignitesafety.sc' },
-    { name: 'Jean-Francois Lepathy', email: 'admin@ignitesafety.sc', passwordHash, role: 'ADMIN' }
+    { name: 'Jean-Francois Lepathy', username: 'admin', email: 'admin@ignitesafety.sc', passwordHash, role: 'ADMIN' }
   );
   const sales = await findOrCreate(
     prisma.user,
     { email: 'sales@ignitesafety.sc' },
-    { name: 'Marie-Ange Confait', email: 'sales@ignitesafety.sc', passwordHash, role: 'SALES' }
+    { name: 'Marie-Ange Confait', username: 'sales', email: 'sales@ignitesafety.sc', passwordHash, role: 'SALES' }
   );
   const tech1 = await findOrCreate(
     prisma.user,
     { email: 'tech@ignitesafety.sc' },
-    { name: 'Jonathan Camille', email: 'tech@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
+    { name: 'Jonathan Camille', username: 'tech', email: 'tech@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
   );
   const tech2 = await findOrCreate(
     prisma.user,
     { email: 'tech2@ignitesafety.sc' },
-    { name: 'Keddy Barbe', email: 'tech2@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
+    { name: 'Keddy Barbe', username: 'tech2', email: 'tech2@ignitesafety.sc', passwordHash, role: 'TECHNICIAN' }
   );
 
   // --- Tax Rates ---
@@ -187,10 +187,11 @@ async function main() {
   }
 
   console.log('Seed complete.');
-  console.log('Demo logins (password: password123):');
-  console.log('  admin@ignitesafety.sc  (ADMIN)');
-  console.log('  sales@ignitesafety.sc  (SALES)');
-  console.log('  tech@ignitesafety.sc   (TECHNICIAN)');
+  console.log('Demo logins (username / password: password123):');
+  console.log('  admin  (ADMIN)');
+  console.log('  sales  (SALES)');
+  console.log('  tech   (TECHNICIAN)');
+  console.log('  tech2  (TECHNICIAN)');
 }
 
 main()

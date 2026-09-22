@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export type QuickAddField = {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'select' | 'textarea' | 'date' | 'checkbox';
+  type?: 'text' | 'number' | 'select' | 'textarea' | 'date' | 'checkbox' | 'password';
   options?: { value: string; label: string }[];
   required?: boolean;
   defaultValue?: any;
@@ -117,8 +117,9 @@ export default function QuickAddButton({
               </label>
             ) : (
               <input
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'password' ? 'password' : 'text'}
                 step={f.step}
+                autoComplete={f.type === 'password' ? 'new-password' : undefined}
                 className="input"
                 value={values[f.key]}
                 onChange={(e) => set(f.key, f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}

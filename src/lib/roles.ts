@@ -13,6 +13,13 @@ export const ROLE_HOME: Record<AppRole, string> = {
  * Admin: unrestricted. Sales: everything except /admin (global settings).
  * Technician: mobile POS only. */
 export const ROUTE_ACCESS: { prefix: string; roles: AppRole[] }[] = [
+  // More specific rules must come before the general '/admin' rule below —
+  // ROUTE_ACCESS.find() in middleware.ts takes the first match. Products &
+  // Services (admin/catalog) is listed in the Sales & Get Paid nav group
+  // (nav-config.ts) and can be edited by a non-admin granted edit access
+  // to it (see edit-permissions-constants.ts), so Sales needs to reach the
+  // page at all, even though the rest of /admin stays Admin-only.
+  { prefix: '/admin/catalog', roles: ['ADMIN', 'SALES'] },
   { prefix: '/admin', roles: ['ADMIN'] },
   { prefix: '/billing', roles: ['ADMIN', 'SALES'] },
   { prefix: '/outreach', roles: ['ADMIN', 'SALES'] },

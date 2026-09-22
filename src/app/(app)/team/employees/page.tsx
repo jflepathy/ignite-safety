@@ -11,12 +11,15 @@ function toDateInput(d: Date | null) {
 
 const EMPLOYMENT_TYPES = ['Permanent', 'Contract', 'Part-Time', 'Probation'];
 
-export default async function EmployeesPage() {
-  const [employees, settings, session] = await Promise.all([
+export default async function EmployeesPage({ searchParams }: { searchParams: { showInactive?: string } }) {
+  const showInactive = searchParams?.showInactive === '1';
+  const [allEmployees, settings, session] = await Promise.all([
     prisma.employee.findMany({ orderBy: { name: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     getServerSession(authOptions),
   ]);
+  const inactiveCount = allEmployees.filter((e) => !e.active).length;
+  const employees = showInactive ? allEmployees : allEmployees.filter((e) => e.active);
   const currency = settings?.currencyCode ?? 'SCR';
   const isAdmin = session?.user.role === 'ADMIN';
 
@@ -27,7 +30,13 @@ export default async function EmployeesPage() {
           <h1 className="text-2xl font-semibold text-ink-900">Employees</h1>
           <p className="text-sm text-slate-500">Team roster used for time tracking and job assignment.</p>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-4">
+          {inactiveCount > 0 && (
+            <a href={showInactive ? '/team/employees' : '/team/employees?showInactive=1'} className="text-xs font-medium text-brand-600 hover:underline">
+              {showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
+            </a>
+          )}
+          {isAdmin && (
           <QuickAddButton
             label="+ New Employee"
             title="New Employee"
@@ -62,7 +71,8 @@ export default async function EmployeesPage() {
               { key: 'payRate', label: `Pay Rate (${currency}) — monthly amount for Monthly pay type`, type: 'number', step: '0.01' },
             ]}
           />
-        )}
+          )}
+        </div>
       </div>
 
       <div className="card overflow-x-auto">

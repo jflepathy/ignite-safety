@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginForm({ companyName, logoUrl }: { companyName: string; logoUrl: string | null }) {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,10 +15,14 @@ export default function LoginForm({ companyName, logoUrl }: { companyName: strin
     e.preventDefault();
     setLoading(true);
     setError('');
-    const res = await signIn('credentials', { redirect: false, email, password });
+    const res = await signIn('credentials', { redirect: false, username, password });
     setLoading(false);
     if (res?.error) {
-      setError('Invalid email or password.');
+      // Deliberately generic — covers "wrong password" and "account
+      // temporarily locked after too many failed attempts" with the same
+      // message, so a script (or a person) probing usernames can't tell
+      // which one is true.
+      setError('Invalid username or password. If this keeps happening, the account may be temporarily locked for security — wait a few minutes and try again, or contact an admin.');
       return;
     }
     router.push('/');
@@ -41,14 +45,16 @@ export default function LoginForm({ companyName, logoUrl }: { companyName: strin
         </div>
         <form onSubmit={handleSubmit} className="card space-y-4 p-6">
           <div>
-            <label className="label">Email</label>
+            <label className="label">Username</label>
             <input
               className="input"
-              type="email"
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@ignitesafety.sc"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="username"
             />
           </div>
           <div>

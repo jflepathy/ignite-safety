@@ -16,6 +16,7 @@ export default function QuickEditButton({
   initialValues,
   label = 'Edit',
   buttonClassName = 'text-xs font-medium text-brand-600 hover:underline',
+  onSaved,
 }: {
   title: string;
   apiUrl: string;
@@ -23,6 +24,10 @@ export default function QuickEditButton({
   initialValues: Record<string, any>;
   label?: string;
   buttonClassName?: string;
+  /** Optional: called with the API's JSON response after a successful save,
+   * so the caller can update its own local list state instead of relying
+   * solely on router.refresh() (which still also runs). */
+  onSaved?: (updated: any) => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -41,7 +46,15 @@ export default function QuickEditButton({
     setSubmitting(true);
     setError('');
     try {
-      const cleaned = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v === '' ? null : v]));
+      // Password-type fields are "leave unchanged if blank" — omit rather
+      // than send null/empty, since the API treats an absent password as
+      // "don't reset it" and would otherwise fail validation on null.
+      const passwordKeys = new Set(fields.filter((f) => f.type === 'password').map((f) => f.key));
+      const cleaned = Object.fromEntries(
+        Object.entries(values)
+          .filter(([k, v]) => !(passwordKeys.has(k) && !v))
+          .map(([k, v]) => [k, v === '' ? null : v])
+      );
       const res = await fetch(apiUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -51,6 +64,8 @@ export default function QuickEditButton({
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ? JSON.stringify(body.error) : 'Failed to save');
       }
+      const updated = await res.json().catch(() => null);
+      if (updated && onSaved) onSaved(updated);
       setOpen(false);
       router.refresh();
     } catch (e: any) {
@@ -97,8 +112,10 @@ export default function QuickEditButton({
               </label>
             ) : (
               <input
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'password' ? 'password' : 'text'}
                 step={f.step}
+                autoComplete={f.type === 'password' ? 'new-password' : undefined}
+                placeholder={f.type === 'password' ? 'Leave blank to keep current password' : undefined}
                 className="input"
                 value={values[f.key] ?? ''}
                 onChange={(e) => set(f.key, f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}

@@ -1,16 +1,27 @@
+import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
+import { canEditModule } from '@/lib/edit-permissions-constants';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
 import PayBillButton from '@/components/expenses/pay-bill-button';
+import QuickEditButton from '@/components/shared/quick-edit-button';
+
+function toDateInput(d: Date | null) {
+  return d ? d.toISOString().slice(0, 10) : '';
+}
 
 export default async function BillsPage() {
-  const [bills, settings] = await Promise.all([
+  const [bills, settings, session] = await Promise.all([
     prisma.bill.findMany({ include: { supplier: true }, orderBy: { billDate: 'desc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    getServerSession(authOptions),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';
   const totalOwed = bills.reduce((s, b) => s + Number(b.balanceDue), 0);
+  const isAdmin = session?.user.role === 'ADMIN';
+  const canEdit = canEditModule('bills', isAdmin, session?.user.editModules);
 
   return (
     <div className="space-y-6">
@@ -56,7 +67,40 @@ export default async function BillsPage() {
                 <td className="px-4 py-3 text-right">{formatMoney(b.total.toString(), currency)}</td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(b.balanceDue.toString(), currency)}</td>
                 <td className="px-4 py-3 text-right">
-                  {Number(b.balanceDue) > 0 && <PayBillButton billId={b.id} maxAmount={Number(b.balanceDue)} currency={currency} />}
+                  <div className="flex items-center justify-end gap-3">
+                    {canEdit && (
+                      <QuickEditButton
+                        title={`Edit ${b.billNumber}`}
+                        apiUrl={`/api/bills/${b.id}`}
+                        initialValues={{
+                          supplierRef: b.supplierRef ?? '',
+                          dueDate: toDateInput(b.dueDate),
+                          terms: b.terms ?? '',
+                          notes: b.notes ?? '',
+                          status: b.status,
+                        }}
+                        fields={[
+                          { key: 'supplierRef', label: "Supplier's Ref #" },
+                          { key: 'dueDate', label: 'Due Date', type: 'date' },
+                          { key: 'terms', label: 'Terms' },
+                          { key: 'notes', label: 'Notes', type: 'textarea' },
+                          {
+                            key: 'status',
+                            label: 'Status',
+                            type: 'select',
+                            options: [
+                              { value: 'OPEN', label: 'Open' },
+                              { value: 'PARTIAL', label: 'Partial' },
+                              { value: 'PAID', label: 'Paid' },
+                              { value: 'OVERDUE', label: 'Overdue' },
+                              { value: 'VOID', label: 'Void' },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
+                    {Number(b.balanceDue) > 0 && <PayBillButton billId={b.id} maxAmount={Number(b.balanceDue)} currency={currency} />}
+                  </div>
                 </td>
               </tr>
             ))}

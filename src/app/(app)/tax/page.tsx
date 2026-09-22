@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { formatMoney } from '@/lib/money';
 import QuickAddButton from '@/components/shared/quick-add-button';
+import TaxRateActions from '@/components/tax/tax-rate-actions';
 
 // Tax Center: Tier 2 — tax rates are fully manageable and VAT collected is
 // summed from real invoice data. A full multi-jurisdiction filing workflow
@@ -62,6 +63,7 @@ export default async function TaxCenterPage() {
               <th className="px-4 py-2 text-right">Rate</th>
               <th className="px-4 py-2">Default</th>
               <th className="px-4 py-2">Status</th>
+              {isAdmin && <th className="px-4 py-2"></th>}
             </tr>
           </thead>
           <tbody>
@@ -71,11 +73,16 @@ export default async function TaxCenterPage() {
                 <td className="px-4 py-2 text-right">{Number(t.ratePercent).toFixed(2)}%</td>
                 <td className="px-4 py-2 text-slate-500">{t.isDefault ? 'Yes' : ''}</td>
                 <td className="px-4 py-2 text-slate-500">{t.active ? 'Active' : 'Inactive'}</td>
+                {isAdmin && (
+                  <td className="px-4 py-2">
+                    <TaxRateActions rate={{ id: t.id, name: t.name, ratePercent: Number(t.ratePercent), isDefault: t.isDefault, active: t.active }} />
+                  </td>
+                )}
               </tr>
             ))}
             {taxRates.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={isAdmin ? 5 : 4} className="px-4 py-6 text-center text-slate-400">
                   No tax rates set up yet.
                 </td>
               </tr>

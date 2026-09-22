@@ -1,14 +1,25 @@
+import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
+import { canEditModule } from '@/lib/edit-permissions-constants';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
+import QuickEditButton from '@/components/shared/quick-edit-button';
+
+function toDateInput(d: Date | null) {
+  return d ? d.toISOString().slice(0, 10) : '';
+}
 
 export default async function PurchaseOrdersPage() {
-  const [orders, settings] = await Promise.all([
+  const [orders, settings, session] = await Promise.all([
     prisma.purchaseOrder.findMany({ include: { supplier: true }, orderBy: { orderDate: 'desc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    getServerSession(authOptions),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';
+  const isAdmin = session?.user.role === 'ADMIN';
+  const canEdit = canEditModule('purchaseOrders', isAdmin, session?.user.editModules);
 
   return (
     <div className="space-y-6">
@@ -32,6 +43,7 @@ export default async function PurchaseOrdersPage() {
               <th className="px-4 py-3">Expected</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Total</th>
+              {canEdit && <th className="px-4 py-3"></th>}
             </tr>
           </thead>
           <tbody>
@@ -45,11 +57,41 @@ export default async function PurchaseOrdersPage() {
                   <StatusBadge status={o.status} />
                 </td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(o.total.toString(), currency)}</td>
+                {canEdit && (
+                  <td className="px-4 py-3 text-right">
+                    <QuickEditButton
+                      title={`Edit ${o.poNumber}`}
+                      apiUrl={`/api/purchase-orders/${o.id}`}
+                      initialValues={{
+                        expectedDate: toDateInput(o.expectedDate),
+                        notes: o.notes ?? '',
+                        status: o.status,
+                      }}
+                      fields={[
+                        { key: 'expectedDate', label: 'Expected Date', type: 'date' },
+                        { key: 'notes', label: 'Notes', type: 'textarea' },
+                        {
+                          key: 'status',
+                          label: 'Status',
+                          type: 'select',
+                          options: [
+                            { value: 'DRAFT', label: 'Draft' },
+                            { value: 'OPEN', label: 'Open' },
+                            { value: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
+                            { value: 'RECEIVED', label: 'Received' },
+                            { value: 'CLOSED', label: 'Closed' },
+                            { value: 'CANCELLED', label: 'Cancelled' },
+                          ],
+                        },
+                      ]}
+                    />
+                  </td>
+                )}
               </tr>
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={canEdit ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
                   No purchase orders yet.
                 </td>
               </tr>

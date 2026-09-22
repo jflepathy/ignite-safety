@@ -1,11 +1,17 @@
+import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
+import { canEditModule } from '@/lib/edit-permissions-constants';
 import ShopItemsManager from '@/components/admin/shop-items-manager';
 
 export default async function CatalogPage() {
-  const [shopItems, settings] = await Promise.all([
+  const [shopItems, settings, session] = await Promise.all([
     prisma.shopItem.findMany({ orderBy: { name: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    getServerSession(authOptions),
   ]);
+  const isAdmin = session?.user.role === 'ADMIN';
+  const canEdit = canEditModule('productsServices', isAdmin, session?.user.editModules);
 
   return (
     <div className="space-y-6">
@@ -29,6 +35,7 @@ export default async function CatalogPage() {
           active: i.active,
         }))}
         currency={settings?.currencyCode ?? 'SCR'}
+        canEdit={canEdit}
       />
     </div>
   );

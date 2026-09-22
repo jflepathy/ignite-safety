@@ -194,11 +194,18 @@ enum PayType {
 model User {
   id           String   @id @default(cuid())
   name         String
+  username     String   @unique // login identifier as of Session 7 — email is kept for records/contact only, no longer used to sign in
   email        String   @unique
   passwordHash String
   role         UserRole @default(SALES)
   phone        String?
   active       Boolean  @default(true)
+  // Login attempt limiting (Session 7): failedLoginAttempts resets to 0 on
+  // any successful login; after 5 consecutive failures the account is
+  // locked (lockedUntil set) for an escalating cooldown so automated
+  // password-guessing can't run unlimited combinations against one account.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -215,21 +222,31 @@ model User {
   @@map("users")
 }
 
-// Explicit per-staff-member feature-visibility overrides, layered on top of
-// the base 3-role system (Admin/Sales/Technician). moduleKey matches the
-// keys used in AppSettings.uiModules / nav-config (e.g. "accounting",
-// "expenses", "inventory"). When no override row exists for a user+module,
-// the role default (ROUTE_ACCESS in lib/roles.ts) applies unchanged.
+// Explicit per-staff-member overrides, layered on top of the base 3-role
+// system (Admin/Sales/Technician). Two independent kinds, distinguished by
+// `action`:
+//  - action="view"  (the original, Session 5, kind): feature-visibility —
+//    moduleKey matches AppSettings.uiModules / nav-config keys (e.g.
+//    "accounting", "expenses", "inventory").
+//  - action="edit"  (added Session 7): per-record edit capability for a
+//    specific set of components — moduleKey is one of EDIT_MODULE_KEYS in
+//    lib/edit-permissions-constants.ts (e.g. "customers", "suppliers").
+//    Unlike view overrides (which can only narrow access), edit is
+//    deny-by-default for non-admins: allowed=true is what GRANTS edit
+//    rights to a chosen non-admin user; no row means no edit access.
+// When no override row exists for a user+module+action, the appropriate
+// default applies (role default for view; deny for edit, admin excepted).
 model UserPermissionOverride {
   id         String   @id @default(cuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   moduleKey  String
+  action     String   @default("view") // "view" | "edit"
   allowed    Boolean
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([userId, moduleKey])
+  @@unique([userId, moduleKey, action])
   @@map("user_permission_overrides")
 }
 

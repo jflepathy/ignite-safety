@@ -19,7 +19,8 @@ export async function GET() {
 const SetSchema = z.object({
   userId: z.string(),
   moduleKey: z.string(),
-  allowed: z.boolean().nullable(), // null = remove the override, fall back to role default
+  action: z.enum(['view', 'edit']).default('view'),
+  allowed: z.boolean().nullable(), // null = remove the override, fall back to the default for that action
 });
 
 export async function PUT(req: NextRequest) {
@@ -28,24 +29,24 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   const parsed = SetSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const { userId, moduleKey, allowed } = parsed.data;
+  const { userId, moduleKey, action, allowed } = parsed.data;
 
   if (allowed === null) {
-    await prisma.userPermissionOverride.deleteMany({ where: { userId, moduleKey } });
+    await prisma.userPermissionOverride.deleteMany({ where: { userId, moduleKey, action } });
   } else {
     // Sequential find-then-write instead of upsert() — the Neon HTTP driver
     // adapter (used so this runs on Cloudflare Workers) doesn't support the
     // implicit transaction Prisma wraps upsert() in.
     const existingOverride = await prisma.userPermissionOverride.findUnique({
-      where: { userId_moduleKey: { userId, moduleKey } },
+      where: { userId_moduleKey_action: { userId, moduleKey, action } },
     });
     if (existingOverride) {
       await prisma.userPermissionOverride.update({
-        where: { userId_moduleKey: { userId, moduleKey } },
+        where: { userId_moduleKey_action: { userId, moduleKey, action } },
         data: { allowed },
       });
     } else {
-      await prisma.userPermissionOverride.create({ data: { userId, moduleKey, allowed } });
+      await prisma.userPermissionOverride.create({ data: { userId, moduleKey, action, allowed } });
     }
   }
 
@@ -55,7 +56,7 @@ export async function PUT(req: NextRequest) {
       action: 'PERMISSION_OVERRIDE_SET',
       entityType: 'User',
       entityId: userId,
-      metadata: { moduleKey, allowed },
+      metadata: { moduleKey, action, allowed },
     },
   });
 

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import QuickEditButton from '@/components/shared/quick-edit-button';
 
 type Item = {
   id: string;
@@ -23,7 +24,7 @@ const TYPE_LABELS: Record<Item['itemType'], string> = {
   BUNDLE: 'Bundle',
 };
 
-export default function ShopItemsManager({ items, currency }: { items: Item[]; currency: string }) {
+export default function ShopItemsManager({ items, currency, canEdit }: { items: Item[]; currency: string; canEdit: boolean }) {
   const router = useRouter();
   const [list, setList] = useState(items);
   const [form, setForm] = useState({
@@ -148,6 +149,7 @@ export default function ShopItemsManager({ items, currency }: { items: Item[]; c
             <th className="py-2 text-right">Qty on Hand</th>
             <th className="py-2">Taxable</th>
             <th className="py-2">Active</th>
+            {canEdit && <th className="py-2"></th>}
           </tr>
         </thead>
         <tbody>
@@ -163,19 +165,57 @@ export default function ShopItemsManager({ items, currency }: { items: Item[]; c
               <td className="py-2 text-right text-slate-500">{item.itemType === 'INVENTORY' ? item.quantityOnHand ?? 0 : '—'}</td>
               <td className="py-2">{item.taxable ? 'Yes' : 'No'}</td>
               <td className="py-2">
-                <button
-                  type="button"
-                  onClick={() => toggleActive(item.id, !item.active)}
-                  className={`badge ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
-                >
-                  {item.active ? 'Active' : 'Inactive'}
-                </button>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleActive(item.id, !item.active)}
+                    className={`badge ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
+                  >
+                    {item.active ? 'Active' : 'Inactive'}
+                  </button>
+                ) : (
+                  <span className={`badge ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {item.active ? 'Active' : 'Inactive'}
+                  </span>
+                )}
               </td>
+              {canEdit && (
+                <td className="py-2 text-right">
+                  <QuickEditButton
+                    title={`Edit ${item.name}`}
+                    apiUrl={`/api/shop-items/${item.id}`}
+                    initialValues={{
+                      name: item.name,
+                      category: item.category ?? '',
+                      unitPrice: Number(item.unitPrice),
+                      taxable: item.taxable,
+                      quantityOnHand: item.quantityOnHand ?? 0,
+                      reorderPoint: item.reorderPoint ?? 0,
+                    }}
+                    fields={[
+                      { key: 'name', label: 'Name', required: true },
+                      { key: 'category', label: 'Category' },
+                      { key: 'unitPrice', label: `Unit Price (${currency})`, type: 'number', step: '0.01' },
+                      { key: 'taxable', label: 'Taxable', type: 'checkbox' },
+                      ...(item.itemType === 'INVENTORY'
+                        ? ([
+                            { key: 'quantityOnHand', label: 'Qty on Hand', type: 'number' },
+                            { key: 'reorderPoint', label: 'Reorder Point', type: 'number' },
+                          ] as const)
+                        : []),
+                    ]}
+                    onSaved={(updated) =>
+                      setList((prev) => prev.map((x) => (x.id === item.id ? { ...x, ...updated, unitPrice: updated.unitPrice?.toString() ?? x.unitPrice } : x)))
+                    }
+                  />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
 
+      {canEdit && (
       <div className="space-y-3 rounded-lg bg-slate-50 p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
@@ -242,6 +282,7 @@ export default function ShopItemsManager({ items, currency }: { items: Item[]; c
           + Add Item
         </button>
       </div>
+      )}
     </div>
   );
 }

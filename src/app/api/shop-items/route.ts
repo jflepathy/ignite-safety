@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/api-auth';
+import { requireRole, requireEdit } from '@/lib/api-auth';
 import { z } from 'zod';
 
 export async function GET() {
@@ -26,7 +26,7 @@ const CreateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireRole('ADMIN');
+  const { error } = await requireEdit('productsServices', 'ADMIN', 'SALES');
   if (error) return error;
   const body = await req.json();
   const parsed = CreateSchema.safeParse(body);

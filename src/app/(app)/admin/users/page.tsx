@@ -3,7 +3,7 @@ import UsersManager from '@/components/admin/users-manager';
 
 export default async function UsersPage() {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, active: true },
+    select: { id: true, name: true, username: true, email: true, phone: true, role: true, active: true, lockedUntil: true },
     orderBy: { createdAt: 'asc' },
   });
   return (

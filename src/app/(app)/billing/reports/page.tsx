@@ -1,16 +1,23 @@
 import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
 import { differenceInCalendarDays } from 'date-fns';
+import PrintButton from '@/components/print-button';
+import ReportDateFilter from '@/components/reports/report-date-filter';
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }: { searchParams: { from?: string; to?: string } }) {
+  const fromDate = searchParams?.from ? new Date(searchParams.from) : null;
+  // Include the whole "to" day, not just its midnight instant.
+  const toDate = searchParams?.to ? new Date(new Date(searchParams.to).getTime() + 24 * 60 * 60 * 1000 - 1) : null;
+  const dateRange = fromDate || toDate ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : undefined;
+
   const [settings, invoices, payments, expenses] = await Promise.all([
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.invoice.findMany({
       where: { deletedAt: null, status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] }, balanceDue: { gt: 0 } },
       include: { customer: true },
     }),
-    prisma.payment.findMany(),
-    prisma.expense.findMany(),
+    prisma.payment.findMany({ where: dateRange ? { paidAt: dateRange } : undefined }),
+    prisma.expense.findMany({ where: dateRange ? { date: dateRange } : undefined }),
   ]);
 
   const currency = settings?.currencyCode ?? 'SCR';
@@ -33,7 +40,7 @@ export default async function ReportsPage() {
   const income = payments.reduce((s, p) => s + Number(p.amount), 0);
   const expenseTotal = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const invoicesAll = await prisma.invoice.findMany({
-    where: { deletedAt: null, status: { not: 'VOID' } },
+    where: { deletedAt: null, status: { not: 'VOID' }, ...(dateRange ? { issueDate: dateRange } : {}) },
     select: { subtotal: true, taxTotal: true },
   });
   const totalTaxCollected = invoicesAll.reduce((s, i) => s + Number(i.taxTotal), 0);
@@ -47,12 +54,23 @@ export default async function ReportsPage() {
     ['d90_plus', '90+ days'],
   ];
 
+  const rangeLabel =
+    fromDate || toDate
+      ? `${searchParams.from ? new Date(searchParams.from).toLocaleDateString() : 'the start'} – ${searchParams.to ? new Date(searchParams.to).toLocaleDateString() : 'today'}`
+      : 'All time';
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink-900">Financial Reports</h1>
-        <p className="text-sm text-slate-500">Accounts receivable, income vs. expense, and sales tax collection.</p>
+    <div className="space-y-8 print-area">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink-900">Financial Reports</h1>
+          <p className="text-sm text-slate-500">Accounts receivable, income vs. expense, and sales tax collection.</p>
+          <p className="mt-1 hidden text-xs text-slate-400 print:block">Period: {rangeLabel} — printed {new Date().toLocaleDateString()}</p>
+        </div>
+        <PrintButton />
       </div>
+
+      <ReportDateFilter />
 
       <section className="card p-6">
         <h2 className="mb-4 text-sm font-semibold text-ink-900">Accounts Receivable Aging</h2>
@@ -101,6 +119,7 @@ export default async function ReportsPage() {
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
           <h2 className="mb-4 text-sm font-semibold text-ink-900">Income vs. Expense Summary</h2>
+          <p className="mb-3 text-xs text-slate-400">{rangeLabel}</p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-600">Total Income (payments received)</span>
@@ -121,6 +140,7 @@ export default async function ReportsPage() {
 
         <div className="card p-6">
           <h2 className="mb-4 text-sm font-semibold text-ink-900">Sales Tax Collection Summary</h2>
+          <p className="mb-3 text-xs text-slate-400">{rangeLabel}</p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-600">Total Taxable Sales</span>
