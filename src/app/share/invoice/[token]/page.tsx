@@ -48,6 +48,7 @@ export default async function SharedInvoicePage({ params }: { params: { token: s
           documentNumber={invoice.invoiceNumber}
           issueDate={invoice.issueDate.toLocaleDateString()}
           dueDate={invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null}
+          poNumber={invoice.poNumber}
           terms={invoice.terms}
           customer={{
             displayName: invoice.customer.displayName,

@@ -727,11 +727,13 @@ model Opportunity {
 // ---------------------------------------------------------------------------
 
 model Employee {
-  id         String    @id @default(cuid())
-  userId     String?   @unique
-  name       String
-  email      String?
-  phone      String?
+  id          String    @id @default(cuid())
+  userId      String?   @unique
+  name        String
+  nin         String? // National Identification Number
+  homeAddress String?
+  email       String?
+  phone       String?
   jobTitle   String?
   department String?
   hireDate   DateTime?
@@ -1033,10 +1035,29 @@ model WorkOrder {
   updatedAt                DateTime        @updatedAt
 
   inspectionItems WorkOrderInspectionItem[]
+  historyEntries  WorkOrderHistoryEntry[]
 
   @@index([status])
   @@index([scheduledDate])
   @@map("work_orders")
+}
+
+// Admin-only audit trail of claims, assignments and status changes on a
+// Work Order (Session 12) — surfaced on the Work Order detail page for
+// ADMIN only, so office staff can see who claimed/updated a job and when
+// without technicians needing to log anything separately.
+model WorkOrderHistoryEntry {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  action      String // CREATED | ASSIGNED | CLAIMED | STATUS_CHANGED | COMPLETED | DELETED
+  detail      String? // human-readable summary, e.g. "Assigned to Joel Payet"
+  byUserId    String?
+  byUserName  String? // snapshot of the actor's name at the time
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@map("work_order_history")
 }
 
 model WorkOrderInspectionItem {
@@ -1085,6 +1106,7 @@ model Invoice {
   status                 InvoiceStatus @default(DRAFT)
   issueDate              DateTime      @default(now())
   dueDate                DateTime?
+  poNumber               String? // customer's purchase order number, shown under Due Date on the printable document
   globalDiscountPercent  Decimal       @default(0) @db.Decimal(5, 2)
   subtotal               Decimal       @default(0) @db.Decimal(12, 2)
   discountTotal          Decimal       @default(0) @db.Decimal(12, 2)
@@ -1359,6 +1381,8 @@ model AppSettings {
   journalEntryNextSeq   Int    @default(1)
   itemSkuPrefix         String @default("ITM")
   itemSkuNextSeq        Int    @default(1)
+  expensePrefix         String @default("EXP")
+  expenseNextSeq        Int    @default(1)
 
   // ---- 2. Scheduling & Dispatch Engine ------------------------------------
   dailyTeamCapacity            Int     @default(3)
@@ -1366,6 +1390,10 @@ model AppSettings {
   overdueThresholdDays         Int     @default(30)
   defaultServiceIntervalMonths Int     @default(12)
   reminderLeadDays             Int     @default(45)
+  // When off, the mobile POS lets a technician Complete & Sync a Work
+  // Order without capturing a customer name/signature — admin-only toggle
+  // (Session 12).
+  requireCustomerSignoff       Boolean @default(true)
 
   // ---- Tax & Financial Settings --------------------------------------------
   defaultTaxRateId      String?
@@ -1385,7 +1413,8 @@ model AppSettings {
 
 // Simple operating-expense ledger, feeds the Income vs. Expense report.
 model Expense {
-  id          String        @id @default(cuid())
+  id            String        @id @default(cuid())
+  expenseNumber String?       @unique // e.g. EXP-2026-0001, shown on the printable/downloadable receipt
   date        DateTime      @default(now())
   category    String // e.g. "Vehicle Fuel", "Parts & Supplies", "Rent", "Salaries"
   vendor      String? // free-text vendor name, kept for entries not mapped to a Supplier record

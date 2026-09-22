@@ -58,9 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   else if (invoice.dueDate && invoice.dueDate < new Date()) status = 'OVERDUE';
   else status = invoice.status === 'DRAFT' ? 'SENT' : (invoice.status as any);
 
-  const updated = await prisma.invoice.update({
+  await prisma.invoice.update({
     where: { id: params.id },
     data: { amountPaid: totalPaid, balanceDue, status },
+  });
+  const updated = await prisma.invoice.findUnique({
+    where: { id: params.id },
     include: { payments: true, customer: true, lineItems: true },
   });
 

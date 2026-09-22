@@ -1,10 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { StatusBadge } from '@/components/status-badge';
 import AssignTechnicianForm from '@/components/work-orders/assign-technician-form';
 
 export default async function WorkOrderDetailPage({ params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  const isAdmin = session!.user.role === 'ADMIN';
   const [wo, technicians] = await Promise.all([
     prisma.workOrder.findUnique({
       where: { id: params.id },
@@ -15,6 +19,7 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
         inspectionItems: true,
         invoice: true,
         serviceRequest: true,
+        ...(isAdmin ? { historyEntries: { orderBy: { createdAt: 'desc' as const } } } : {}),
       },
     }),
     prisma.user.findMany({ where: { role: 'TECHNICIAN', active: true } }),
@@ -154,6 +159,32 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Admin-only audit trail — claims, (re)assignments, status changes,
+          creation and completion (Session 12). Never shown to Sales or
+          Technician roles. */}
+      {isAdmin && (
+        <div className="card p-6">
+          <h2 className="mb-3 text-sm font-semibold text-ink-900">Claim &amp; Update History</h2>
+          <p className="mb-3 text-xs text-slate-400">Visible to Admin only.</p>
+          <div className="space-y-2">
+            {((wo as any).historyEntries ?? []).map((h: any) => (
+              <div key={h.id} className="flex items-start justify-between gap-4 border-t border-slate-100 pt-2 text-sm first:border-t-0 first:pt-0">
+                <div>
+                  <span className="badge bg-slate-100 text-slate-600">{h.action.replace(/_/g, ' ')}</span>
+                  <p className="mt-1 text-slate-600">{h.detail ?? '—'}</p>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-xs text-slate-400">
+                  {new Date(h.createdAt).toLocaleString()}
+                </span>
+              </div>
+            ))}
+            {((wo as any).historyEntries ?? []).length === 0 && (
+              <p className="text-sm text-slate-400">No claim or update history recorded yet.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

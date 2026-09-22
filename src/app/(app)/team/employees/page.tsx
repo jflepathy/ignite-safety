@@ -43,6 +43,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: { 
             apiUrl="/api/employees"
             fields={[
               { key: 'name', label: 'Name', required: true },
+              { key: 'nin', label: 'NIN (National ID Number)' },
+              { key: 'homeAddress', label: 'Home Address', type: 'textarea' },
               { key: 'email', label: 'Email' },
               { key: 'phone', label: 'Phone' },
               { key: 'jobTitle', label: 'Job Title' },
@@ -116,6 +118,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: { 
                       apiUrl={`/api/employees/${e.id}`}
                       initialValues={{
                         name: e.name,
+                        nin: e.nin ?? '',
+                        homeAddress: e.homeAddress ?? '',
                         email: e.email ?? '',
                         phone: e.phone ?? '',
                         jobTitle: e.jobTitle ?? '',
@@ -130,6 +134,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: { 
                       }}
                       fields={[
                         { key: 'name', label: 'Name', required: true },
+                        { key: 'nin', label: 'NIN (National ID Number)' },
+                        { key: 'homeAddress', label: 'Home Address', type: 'textarea' },
                         { key: 'email', label: 'Email' },
                         { key: 'phone', label: 'Phone' },
                         { key: 'jobTitle', label: 'Job Title' },

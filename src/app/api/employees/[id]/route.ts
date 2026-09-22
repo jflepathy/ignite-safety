@@ -5,6 +5,9 @@ import { z } from 'zod';
 
 const UpdateSchema = z.object({
   name: z.string().min(1).optional(),
+  nin: z.string().optional().nullable(),
+  homeAddress: z.string().optional().nullable(),
+  userId: z.string().optional().nullable(), // links this Employee record to a User login (Session 11)
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   jobTitle: z.string().optional().nullable(),

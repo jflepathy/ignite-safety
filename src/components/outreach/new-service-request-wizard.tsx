@@ -34,12 +34,16 @@ export default function NewServiceRequestWizard({
   onClose,
   initialCustomerId,
   initialSourceEquipmentId,
+  workshopAddress,
 }: {
   customers: Customer[];
   technicians: Technician[];
   onClose: () => void;
   initialCustomerId?: string;
   initialSourceEquipmentId?: string;
+  /** Company address — Workshop jobs happen here, so the wizard doesn't
+   * need to ask for region/district/building for them (Session 12). */
+  workshopAddress?: string | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -72,13 +76,29 @@ export default function NewServiceRequestWizard({
   );
 
   useEffect(() => {
-    if (customerId && !region) {
-      const c = customerList.find((c) => c.id === customerId);
-      if (c?.region) setRegion(c.region);
-      if (c?.district) setDistrict(c.district);
-    }
+    if (serviceType === 'WORKSHOP' || !customerId || region) return;
+    const c = customerList.find((c) => c.id === customerId);
+    if (c?.region) setRegion(c.region);
+    if (c?.district) setDistrict(c.district);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
+
+  // A Workshop job always happens at Ignite Safety's own premises — no
+  // need to ask which region/district/building it's at, that's fixed
+  // (Session 12). Switching back to Onsite re-derives from the customer.
+  useEffect(() => {
+    if (serviceType === 'WORKSHOP') {
+      setRegion('Mahe');
+      setDistrict('');
+      setBuildingName('');
+      setLocationNotes('');
+    } else {
+      const c = customerList.find((c) => c.id === customerId);
+      setRegion(c?.region ?? '');
+      setDistrict(c?.district ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceType]);
 
   function incCounter(key: string, delta: number) {
     setCounts((prev) => ({ ...prev, [key]: Math.max(0, (prev[key] ?? 0) + delta) }));
@@ -118,7 +138,10 @@ export default function NewServiceRequestWizard({
           proposedDate,
           region,
           district,
-          locationDetails: [buildingName && `Building/House: ${buildingName}`, locationNotes].filter(Boolean).join('\n'),
+          locationDetails:
+            serviceType === 'WORKSHOP'
+              ? workshopAddress || 'Ignite Safety Workshop'
+              : [buildingName && `Building/House: ${buildingName}`, locationNotes].filter(Boolean).join('\n'),
           sourceEquipmentId: initialSourceEquipmentId ?? null,
           equipmentCounts: Object.entries(counts).map(([category, tentativeCount]) => ({ category, tentativeCount })),
         }),
@@ -270,42 +293,54 @@ export default function NewServiceRequestWizard({
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="label">Region</label>
-                  <select
-                    className="input"
-                    value={region}
-                    onChange={(e) => {
-                      setRegion(e.target.value);
-                      setDistrict('');
-                    }}
-                  >
-                    <option value="">Select region…</option>
-                    {REGIONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">District</label>
-                  <select className="input" value={district} onChange={(e) => setDistrict(e.target.value)} disabled={!region}>
-                    <option value="">Select district…</option>
-                    {(REGION_DISTRICTS[region] ?? []).map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {serviceType === 'ONSITE' && (
+                  <>
+                    <div>
+                      <label className="label">Region</label>
+                      <select
+                        className="input"
+                        value={region}
+                        onChange={(e) => {
+                          setRegion(e.target.value);
+                          setDistrict('');
+                        }}
+                      >
+                        <option value="">Select region…</option>
+                        {REGIONS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">District</label>
+                      <select className="input" value={district} onChange={(e) => setDistrict(e.target.value)} disabled={!region}>
+                        <option value="">Select district…</option>
+                        {(REGION_DISTRICTS[region] ?? []).map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {serviceType === 'WORKSHOP' && (
+                <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                  📍 This job will be carried out at Ignite Safety&apos;s own workshop — {workshopAddress || 'no workshop address set in Admin Settings'}
+                  . Region/district and a location aren&apos;t needed.
+                </p>
+              )}
 
               <div>
                 <label className="label">Proposed Date</label>
                 <input type="date" className="input" value={proposedDate} onChange={(e) => setProposedDate(e.target.value)} />
               </div>
 
+              {serviceType === 'ONSITE' && (
               <div>
                 <label className="label">Building / House Name</label>
                 <input
@@ -315,6 +350,8 @@ export default function NewServiceRequestWizard({
                   placeholder="e.g. Hart Building"
                 />
               </div>
+              )}
+              {serviceType === 'ONSITE' && (
               <div>
                 <label className="label">Additional Location Details</label>
                 <textarea
@@ -325,6 +362,7 @@ export default function NewServiceRequestWizard({
                   placeholder="Floor, access instructions…"
                 />
               </div>
+              )}
             </div>
           )}
 

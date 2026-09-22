@@ -29,8 +29,11 @@ export async function POST(req: NextRequest) {
   if (parsed.data.fromAccountId === parsed.data.toAccountId) {
     return NextResponse.json({ error: 'From and To accounts must differ' }, { status: 400 });
   }
-  const transfer = await prisma.accountTransfer.create({
+  const created = await prisma.accountTransfer.create({
     data: { ...parsed.data, createdById: session!.user.id },
+  });
+  const transfer = await prisma.accountTransfer.findUnique({
+    where: { id: created.id },
     include: { fromAccount: true, toAccount: true },
   });
   return NextResponse.json(transfer, { status: 201 });

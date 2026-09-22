@@ -2,14 +2,19 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/status-badge';
 
-// Work orders don't carry a background job that flips them to PAST_DUE, so
-// "past due" is derived here at read time: any job still PENDING or
-// SCHEDULED whose scheduled date has already passed. This keeps the stored
-// status simple (set explicitly by staff / the technician POS) while the
-// dashboard still surfaces overdue jobs accurately.
+// Work orders don't carry a background job that flips their status, so how
+// overdue a job is gets derived here at read time from its scheduled date,
+// on a graduated scale rather than flipping to PAST_DUE the instant the
+// scheduled date/time passes (Session 11 fix — a job scheduled for earlier
+// today isn't "past due" yet):
+//   days 0–3 late:  still PENDING/SCHEDULED, no flag
+//   days 4–6 late:  WARNING
+//   day 7+ late:    PAST_DUE
 function displayStatus(status: string, scheduledDate: Date | null): string {
-  if ((status === 'PENDING' || status === 'SCHEDULED') && scheduledDate && scheduledDate < new Date()) {
-    return 'PAST_DUE';
+  if ((status === 'PENDING' || status === 'SCHEDULED') && scheduledDate) {
+    const daysLate = (Date.now() - scheduledDate.getTime()) / 86_400_000;
+    if (daysLate >= 7) return 'PAST_DUE';
+    if (daysLate >= 4) return 'WARNING';
   }
   return status;
 }
@@ -26,6 +31,7 @@ export default async function WorkOrdersPage() {
 
   const counts = {
     PAST_DUE: withDisplayStatus.filter((w) => w.displayStatus === 'PAST_DUE').length,
+    WARNING: withDisplayStatus.filter((w) => w.displayStatus === 'WARNING').length,
     PENDING: withDisplayStatus.filter((w) => w.displayStatus === 'PENDING').length,
     SCHEDULED: withDisplayStatus.filter((w) => w.displayStatus === 'SCHEDULED').length,
     IN_PROGRESS: withDisplayStatus.filter((w) => w.displayStatus === 'IN_PROGRESS').length,
@@ -39,11 +45,17 @@ export default async function WorkOrdersPage() {
         <p className="text-sm text-slate-500">Digital work order tracking across onsite &amp; workshop jobs.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {Object.entries(counts).map(([status, count]) => (
           <div key={status} className="card p-4 text-center">
             <p className="text-xs uppercase text-slate-500">{status.replace('_', ' ')}</p>
-            <p className={`mt-1 text-2xl font-semibold ${status === 'PAST_DUE' ? 'text-red-600' : 'text-ink-900'}`}>{count}</p>
+            <p
+              className={`mt-1 text-2xl font-semibold ${
+                status === 'PAST_DUE' ? 'text-red-600' : status === 'WARNING' ? 'text-orange-600' : 'text-ink-900'
+              }`}
+            >
+              {count}
+            </p>
           </div>
         ))}
       </div>

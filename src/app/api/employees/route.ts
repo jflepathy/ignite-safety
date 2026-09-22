@@ -12,6 +12,8 @@ export async function GET() {
 
 const CreateSchema = z.object({
   name: z.string().min(1),
+  nin: z.string().optional(),
+  homeAddress: z.string().optional(),
   email: z.string().optional(),
   phone: z.string().optional(),
   jobTitle: z.string().optional(),

@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/status-badge';
 import PrintButton from '@/components/print-button';
 import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument from '@/components/billing/invoice-document';
+import DownloadPdfButton from '@/components/shared/download-pdf-button';
 
 export default async function EstimateDetailPage({ params }: { params: { id: string } }) {
   const [estimate, settings] = await Promise.all([
@@ -39,10 +40,11 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
             ← Back
           </Link>
           <PrintButton />
+          <DownloadPdfButton targetId="pdf-document" fileName={estimate.estimateNumber} />
         </div>
       </div>
 
-      <div className="print-area">
+      <div className="print-area" id="pdf-document">
         <InvoiceDocument
           settings={{
             companyName: settings?.companyName ?? 'Ignite Safety',

@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { REGION_OPTIONS, DISTRICTS_BY_REGION } from '@/components/customers/customers-table';
 
 export default function NewCustomerButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ displayName: '', phone: '', email: '', region: '', district: '', address: '' });
   const [submitting, setSubmitting] = useState(false);
+  const districtOptions = form.region ? DISTRICTS_BY_REGION[form.region] ?? [] : Object.values(DISTRICTS_BY_REGION).flat();
 
   async function submit() {
     setSubmitting(true);
@@ -53,11 +55,29 @@ export default function NewCustomerButton() {
         </div>
         <div>
           <label className="label">Region</label>
-          <input className="input" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
+          <select
+            className="input"
+            value={form.region}
+            onChange={(e) => setForm({ ...form, region: e.target.value, district: '' })}
+          >
+            <option value="">— Select —</option>
+            {REGION_OPTIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="label">District</label>
-          <input className="input" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
+          <select className="input" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })}>
+            <option value="">— Select —</option>
+            {districtOptions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="label">Address</label>

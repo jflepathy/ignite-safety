@@ -105,6 +105,7 @@ export async function PATCH(req: NextRequest) {
     'overdueThresholdDays',
     'defaultServiceIntervalMonths',
     'reminderLeadDays',
+    'requireCustomerSignoff',
     // Tax & Financial
     'defaultTaxRateId',
     'taxInclusivePricing',

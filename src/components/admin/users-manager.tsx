@@ -21,29 +21,52 @@ const ROLE_OPTIONS = [
   { value: 'TECHNICIAN', label: 'Technician' },
 ];
 
-export default function UsersManager({ users }: { users: User[] }) {
+type UnlinkedEmployee = { id: string; name: string; email: string | null };
+
+export default function UsersManager({ users, unlinkedEmployees = [] }: { users: User[]; unlinkedEmployees?: UnlinkedEmployee[] }) {
   const router = useRouter();
   const [list, setList] = useState(users);
-  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'SALES' });
+  const [employeeOptions, setEmployeeOptions] = useState(unlinkedEmployees);
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'SALES', employeeId: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  function pickEmployee(employeeId: string) {
+    const emp = employeeOptions.find((e) => e.id === employeeId);
+    setForm((f) => ({
+      ...f,
+      employeeId,
+      name: emp ? emp.name : f.name,
+      email: emp?.email ? emp.email : f.email,
+    }));
+  }
 
   async function add() {
     setError('');
     setSaving(true);
     try {
+      const { employeeId, ...userForm } = form;
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(userForm),
       });
       if (!res.ok) {
         const body = await res.json();
         throw new Error(body?.error?.formErrors?.[0] ?? 'Failed to create user');
       }
       const user = await res.json();
+      // Link the selected existing Staff record to this new login (Session 11).
+      if (employeeId) {
+        await fetch(`/api/employees/${employeeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        });
+        setEmployeeOptions((prev) => prev.filter((e) => e.id !== employeeId));
+      }
       setList((prev) => [...prev, { ...user, phone: null, lockedUntil: null }]);
-      setForm({ name: '', username: '', email: '', password: '', role: 'SALES' });
+      setForm({ name: '', username: '', email: '', password: '', role: 'SALES', employeeId: '' });
       router.refresh();
     } catch (e: any) {
       setError(e.message);
@@ -140,7 +163,20 @@ export default function UsersManager({ users }: { users: User[] }) {
         </tbody>
       </table>
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-3 lg:grid-cols-7">
+        <select
+          className="input"
+          value={form.employeeId}
+          onChange={(e) => pickEmployee(e.target.value)}
+          title="Optionally link this login to an existing Staff record"
+        >
+          <option value="">— New person (no existing Staff) —</option>
+          {employeeOptions.map((emp) => (
+            <option key={emp.id} value={emp.id}>
+              {emp.name}
+            </option>
+          ))}
+        </select>
         <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input className="input" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         <input className="input" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />

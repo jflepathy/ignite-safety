@@ -35,14 +35,14 @@ export default function SignaturePad({
   }, []);
 
   return (
-    <div>
+    <div className="flex h-full flex-col gap-2">
       <canvas
         ref={canvasRef}
-        className="h-40 w-full touch-none rounded-lg border border-slate-300 bg-white"
+        className="min-h-0 w-full flex-1 touch-none rounded-lg border border-slate-300 bg-white"
       />
       <button
         type="button"
-        className="mt-2 text-xs text-slate-500 underline"
+        className="self-start text-xs text-slate-500 underline"
         onClick={() => {
           padRef.current?.clear();
           onChange(null);

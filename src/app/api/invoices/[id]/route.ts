@@ -35,6 +35,7 @@ const UpdateSchema = z.object({
   customerId: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'SENT', 'PARTIAL', 'PAID', 'OVERDUE', 'VOID']).optional(),
   dueDate: z.string().optional().nullable(),
+  poNumber: z.string().optional().nullable(),
   globalDiscountPercent: z.number().min(0).max(100).optional(),
   terms: z.string().optional(),
   notes: z.string().optional(),
@@ -98,12 +99,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     };
   }
 
-  const invoice = await prisma.invoice.update({
+  // Plain update() + a separate include-fetch, not update({ include }) in
+  // one call — the Neon HTTP adapter can't run the implicit transaction
+  // Prisma wraps an update()+include in whenever the table has relations,
+  // whether or not this particular write touches an included relation's
+  // FK ("Transactions are not supported in HTTP mode") — same root cause
+  // documented on the Work Order PATCH handler. Splitting the write from
+  // the read avoids it.
+  await prisma.invoice.update({
     where: { id: params.id },
     data: {
       ...(data.customerId ? { customerId: data.customerId } : {}),
       ...(data.status ? { status: data.status } : {}),
       ...(data.dueDate !== undefined ? { dueDate: data.dueDate ? new Date(data.dueDate) : null } : {}),
+      ...(data.poNumber !== undefined ? { poNumber: data.poNumber || null } : {}),
       ...(data.globalDiscountPercent !== undefined
         ? { globalDiscountPercent: data.globalDiscountPercent }
         : {}),
@@ -114,6 +123,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(data.customerPaymentOptions !== undefined ? { customerPaymentOptions: data.customerPaymentOptions } : {}),
       ...totalsPatch,
     },
+  });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id },
     include: { lineItems: true, customer: true, payments: true },
   });
 

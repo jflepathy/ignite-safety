@@ -3,7 +3,7 @@ import { computeOutreachList } from '@/lib/scheduling';
 import OutreachClient from '@/components/outreach/outreach-client';
 
 export default async function OutreachPage() {
-  const [rows, customers, scheduledCount, technicians, pendingRequests] = await Promise.all([
+  const [rows, customers, scheduledCount, technicians, pendingRequests, settings] = await Promise.all([
     computeOutreachList(),
     prisma.customer.findMany({
       where: { deletedAt: null },
@@ -17,6 +17,7 @@ export default async function OutreachPage() {
       include: { customer: true, equipmentCounts: true },
       orderBy: { proposedDate: 'asc' },
     }),
+    prisma.appSettings.findUnique({ where: { id: 1 }, select: { companyAddress: true } }),
   ]);
 
   const serializedRows = rows.map((r) => ({
@@ -44,6 +45,7 @@ export default async function OutreachPage() {
       scheduledCount={scheduledCount}
       technicians={technicians}
       pendingRequests={serializedPending}
+      workshopAddress={settings?.companyAddress ?? null}
     />
   );
 }

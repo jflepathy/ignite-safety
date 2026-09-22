@@ -15,7 +15,8 @@ type SeqField =
   | 'purchaseOrderNextSeq'
   | 'supplierCreditNextSeq'
   | 'journalEntryNextSeq'
-  | 'itemSkuNextSeq';
+  | 'itemSkuNextSeq'
+  | 'expenseNextSeq';
 
 type PrefixField =
   | 'invoicePrefix'
@@ -30,7 +31,8 @@ type PrefixField =
   | 'purchaseOrderPrefix'
   | 'supplierCreditPrefix'
   | 'journalEntryPrefix'
-  | 'itemSkuPrefix';
+  | 'itemSkuPrefix'
+  | 'expensePrefix';
 
 // Field names above come only from the fixed SeqField/PrefixField unions
 // (never user input), so interpolating them as column names below is safe.

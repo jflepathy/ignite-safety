@@ -25,6 +25,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { dueDate, ...rest } = parsed.data;
   const data: Record<string, unknown> = { ...rest };
   if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
-  const bill = await prisma.bill.update({ where: { id: params.id }, data, include: { supplier: true, billLineItems: true } });
+  // Plain update() + a separate include-fetch — update()+include in one
+  // call needs an implicit transaction on this table's relations, which
+  // the Neon HTTP adapter can't run ("Transactions are not supported in
+  // HTTP mode"). Same fix as the other document PATCH routes.
+  await prisma.bill.update({ where: { id: params.id }, data });
+  const bill = await prisma.bill.findUnique({ where: { id: params.id }, include: { supplier: true, billLineItems: true } });
   return NextResponse.json(bill);
 }

@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { expectedDate, ...rest } = parsed.data;
   const data: Record<string, unknown> = { ...rest };
   if (expectedDate !== undefined) data.expectedDate = expectedDate ? new Date(expectedDate) : null;
-  const po = await prisma.purchaseOrder.update({ where: { id: params.id }, data, include: { supplier: true, lineItems: true } });
+  await prisma.purchaseOrder.update({ where: { id: params.id }, data });
+  const po = await prisma.purchaseOrder.findUnique({ where: { id: params.id }, include: { supplier: true, lineItems: true } });
   return NextResponse.json(po);
 }

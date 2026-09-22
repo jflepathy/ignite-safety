@@ -11,6 +11,7 @@ type Settings = {
   reminderLeadDays: number;
   workOrderPrefix: string;
   serviceRequestPrefix: string;
+  requireCustomerSignoff: boolean;
 };
 
 export default function SchedulingSettingsForm({ settings }: { settings: Settings }) {
@@ -98,6 +99,17 @@ export default function SchedulingSettingsForm({ settings }: { settings: Setting
         />
         Enable predictive smart reminders on the Outreach dashboard
       </label>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={form.requireCustomerSignoff}
+          onChange={(e) => setForm({ ...form, requireCustomerSignoff: e.target.checked })}
+        />
+        Require customer name &amp; signature to complete a Work Order in the mobile POS
+      </label>
+      <p className="-mt-2 text-xs text-slate-400">
+        Turn this off to let technicians Complete &amp; Sync a job without capturing a customer sign-off (e.g. workshop jobs with no customer present).
+      </p>
       <div className="flex items-center gap-3">
         <button className="btn-primary" disabled={saving} onClick={save}>
           {saving ? 'Saving…' : 'Save Changes'}

@@ -42,6 +42,7 @@ const FREQUENCIES = [
 export type InvoiceFormInitial = {
   customerId: string;
   dueDate: string;
+  poNumber?: string;
   globalDiscountPercent: number;
   terms: string;
   notes: string;
@@ -85,6 +86,7 @@ export default function InvoiceForm({
   const [customerOptions, setCustomerOptions] = useState(customers);
   const [customerId, setCustomerId] = useState(initial?.customerId ?? defaultCustomerId ?? customers[0]?.id ?? '');
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '');
+  const [poNumber, setPoNumber] = useState(initial?.poNumber ?? '');
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(initial?.globalDiscountPercent ?? 0);
   const initialTerms = initial?.terms ?? defaultTerms ?? 'Due on Receipt';
   const [termsPreset, setTermsPreset] = useState(TERMS_PRESETS.includes(initialTerms) ? initialTerms : 'Custom');
@@ -192,6 +194,7 @@ export default function InvoiceForm({
             ? {
                 customerId,
                 dueDate: dueDate || null,
+                poNumber: poNumber || null,
                 globalDiscountPercent,
                 terms,
                 notes,
@@ -204,6 +207,7 @@ export default function InvoiceForm({
                 customerId,
                 workOrderId: workOrderId ?? null,
                 dueDate: dueDate || undefined,
+                poNumber: poNumber || undefined,
                 globalDiscountPercent,
                 terms,
                 notes,
@@ -244,6 +248,15 @@ export default function InvoiceForm({
         <div>
           <label className="label">Due Date</label>
           <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">PO Number</label>
+          <input
+            className="input"
+            placeholder="Customer's purchase order number"
+            value={poNumber}
+            onChange={(e) => setPoNumber(e.target.value)}
+          />
         </div>
         <div>
           <label className="label">Global Discount (%)</label>

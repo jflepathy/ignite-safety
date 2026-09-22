@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
+import { isStaleAssignment } from '@/lib/work-order-status';
 import { z } from 'zod';
 
 const Schema = z.object({
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const wo = await prisma.workOrder.findUnique({ where: { id: params.id } });
   if (!wo) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (session!.user.role === 'TECHNICIAN' && wo.assignedTechnicianId !== session!.user.id) {
+  if (session!.user.role === 'TECHNICIAN' && wo.assignedTechnicianId !== null && wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

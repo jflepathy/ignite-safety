@@ -28,11 +28,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const balanceDue = Math.max(total - totalPaid, 0);
   const status = balanceDue <= 0 ? 'PAID' : totalPaid > 0 ? 'PARTIAL' : 'OPEN';
 
-  const updated = await prisma.bill.update({
+  await prisma.bill.update({
     where: { id: params.id },
     data: { amountPaid: totalPaid, balanceDue, status },
-    include: { supplier: true },
   });
+  const updated = await prisma.bill.findUnique({ where: { id: params.id }, include: { supplier: true } });
 
   return NextResponse.json(updated, { status: 201 });
 }

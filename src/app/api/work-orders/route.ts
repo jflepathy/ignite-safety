@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
+import { logWorkOrderHistory } from '@/lib/work-order-history';
 import { z } from 'zod';
 
 export async function GET(req: NextRequest) {
@@ -35,27 +36,53 @@ const CreateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireRole('ADMIN', 'SALES');
+  // Technicians can create an ad-hoc Work Order themselves for a job they're
+  // doing on site that wasn't pre-scheduled by the office (Session 11).
+  const { session, error } = await requireRole('ADMIN', 'SALES', 'TECHNICIAN');
   if (error) return error;
   const body = await req.json();
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const isTechnician = session!.user.role === 'TECHNICIAN';
+
+  // A technician creating their own on-the-spot job is assigned to
+  // themselves and starts already In Progress — there's no dispatch step.
+  const assignedTechnicianId = isTechnician ? session!.user.id : data.assignedTechnicianId || null;
 
   const woNumber = await nextDocumentNumber('workOrderNextSeq', 'workOrderPrefix');
-  const workOrder = await prisma.workOrder.create({
+  // Plain create() + a separate include-fetch, not create({ include }) in
+  // one call — writing customerId/assignedTechnicianId together with an
+  // `include` of those same relations makes Prisma verify the FK via an
+  // implicit transaction, which the Neon HTTP adapter can't run
+  // ("Transactions are not supported in HTTP mode"), same root cause
+  // documented on the PATCH handler in [id]/route.ts (Session 12).
+  const created = await prisma.workOrder.create({
     data: {
       woNumber,
       customerId: data.customerId,
       siteId: data.siteId || null,
       serviceType: data.serviceType,
-      status: data.assignedTechnicianId ? 'SCHEDULED' : 'PENDING',
-      scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : null,
+      status: isTechnician ? 'IN_PROGRESS' : assignedTechnicianId ? 'SCHEDULED' : 'PENDING',
+      scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : isTechnician ? new Date() : null,
+      startedAt: isTechnician ? new Date() : undefined,
       region: data.region,
       locationDetails: data.locationDetails,
-      assignedTechnicianId: data.assignedTechnicianId || null,
+      assignedTechnicianId,
     },
-    include: { customer: true },
   });
+  const workOrder = await prisma.workOrder.findUnique({ where: { id: created.id }, include: { customer: true } });
+
+  const actorName = session!.user.name ?? session!.user.username ?? 'Someone';
+  await logWorkOrderHistory({
+    workOrderId: created.id,
+    action: 'CREATED',
+    detail: isTechnician
+      ? `${actorName} created this job on site (auto-assigned to self)`
+      : `${actorName} created this work order`,
+    byUserId: session!.user.id,
+    byUserName: actorName,
+  });
+
   return NextResponse.json(workOrder, { status: 201 });
 }

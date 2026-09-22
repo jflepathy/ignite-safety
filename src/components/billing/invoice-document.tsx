@@ -42,6 +42,7 @@ export default function InvoiceDocument({
   documentNumber,
   issueDate,
   dueDate,
+  poNumber,
   terms,
   customer,
   lineItems,
@@ -61,6 +62,7 @@ export default function InvoiceDocument({
   documentNumber: string;
   issueDate: string;
   dueDate?: string | null;
+  poNumber?: string | null;
   terms?: string | null;
   customer: { displayName: string; address: string | null; phone: string | null };
   lineItems: LineItem[];
@@ -132,6 +134,12 @@ export default function InvoiceDocument({
               <>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Due Date</span>
                 <span className="text-right font-medium sm:text-left">{dueDate}</span>
+              </>
+            )}
+            {poNumber && (
+              <>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">PO Number</span>
+                <span className="text-right font-medium sm:text-left">{poNumber}</span>
               </>
             )}
           </div>

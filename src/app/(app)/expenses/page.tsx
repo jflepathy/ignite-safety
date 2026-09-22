@@ -5,6 +5,7 @@ import { canEditModule } from '@/lib/edit-permissions-constants';
 import { formatMoney } from '@/lib/money';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
+import DownloadExpensePdfButton from '@/components/expenses/download-expense-pdf-button';
 
 const METHODS = ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER'];
 
@@ -66,24 +67,43 @@ export default async function ExpensesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+              <th className="px-4 py-3">Expense No.</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Account</th>
               <th className="px-4 py-3">Supplier / Vendor</th>
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Method</th>
               <th className="px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3"></th>
               {canEdit && <th className="px-4 py-3"></th>}
             </tr>
           </thead>
           <tbody>
             {expenses.map((e) => (
               <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50">
+                <td className="px-4 py-3 font-mono text-xs text-slate-500">{e.expenseNumber ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.date.toLocaleDateString()}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{e.account?.name ?? e.category}</td>
                 <td className="px-4 py-3 text-slate-500">{e.supplier?.displayName ?? e.vendor ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.description ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.method.replace('_', ' ')}</td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(e.amount.toString(), currency)}</td>
+                <td className="px-4 py-3 text-right">
+                  {e.expenseNumber && (
+                    <DownloadExpensePdfButton
+                      expenseNumber={e.expenseNumber}
+                      companyName={settings?.companyName ?? 'Ignite Safety'}
+                      date={e.date.toLocaleDateString()}
+                      account={e.account?.name ?? e.category}
+                      vendor={e.supplier?.displayName ?? e.vendor ?? ''}
+                      description={e.description ?? ''}
+                      method={e.method.replace('_', ' ')}
+                      reference={e.reference ?? ''}
+                      amount={e.amount.toString()}
+                      currency={currency}
+                    />
+                  )}
+                </td>
                 {canEdit && (
                   <td className="px-4 py-3 text-right">
                     <QuickEditButton
@@ -121,7 +141,7 @@ export default async function ExpensesPage() {
             ))}
             {expenses.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={canEdit ? 9 : 8} className="px-4 py-10 text-center text-slate-400">
                   No expenses recorded yet.
                 </td>
               </tr>

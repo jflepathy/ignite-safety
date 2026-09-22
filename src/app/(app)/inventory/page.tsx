@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatMoney } from '@/lib/money';
+import InventoryTable from '@/components/inventory/inventory-table';
 
 export default async function InventoryPage() {
   const [items, settings] = await Promise.all([
@@ -34,42 +34,18 @@ export default async function InventoryPage() {
         </div>
       )}
 
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
-              <th className="px-4 py-3">SKU</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3 text-right">Qty on Hand</th>
-              <th className="px-4 py-3 text-right">Reorder Point</th>
-              <th className="px-4 py-3 text-right">Unit Cost</th>
-              <th className="px-4 py-3 text-right">Unit Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {inventoryItems.map((i) => {
-              const low = i.reorderPoint != null && (i.quantityOnHand ?? 0) <= (i.reorderPoint ?? 0);
-              return (
-                <tr key={i.id} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-500">{i.sku}</td>
-                  <td className="px-4 py-3 font-medium text-ink-900">{i.name}</td>
-                  <td className={`px-4 py-3 text-right font-medium ${low ? 'text-red-600' : ''}`}>{i.quantityOnHand ?? 0}</td>
-                  <td className="px-4 py-3 text-right text-slate-500">{i.reorderPoint ?? '—'}</td>
-                  <td className="px-4 py-3 text-right text-slate-500">{i.cost ? formatMoney(i.cost.toString(), currency) : '—'}</td>
-                  <td className="px-4 py-3 text-right">{formatMoney(i.unitPrice.toString(), currency)}</td>
-                </tr>
-              );
-            })}
-            {inventoryItems.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
-                  No items marked as inventory-tracked yet. Set an item&apos;s type to Inventory in Products &amp; Services.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <InventoryTable
+        items={inventoryItems.map((i) => ({
+          id: i.id,
+          sku: i.sku,
+          name: i.name,
+          quantityOnHand: i.quantityOnHand,
+          reorderPoint: i.reorderPoint,
+          cost: i.cost ? i.cost.toString() : null,
+          unitPrice: i.unitPrice.toString(),
+        }))}
+        currency={currency}
+      />
     </div>
   );
 }

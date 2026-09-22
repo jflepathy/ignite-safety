@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
+import { nextDocumentNumber } from '@/lib/numbering';
 import { z } from 'zod';
 
 export async function GET() {
@@ -38,8 +39,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Selected category must be an active Expense account.' }, { status: 400 });
   }
 
+  const expenseNumber = await nextDocumentNumber('expenseNextSeq', 'expensePrefix');
   const expense = await prisma.expense.create({
-    data: { ...rest, accountId, category: account.name, date: date ? new Date(date) : new Date() },
+    data: { ...rest, accountId, category: account.name, date: date ? new Date(date) : new Date(), expenseNumber },
   });
   return NextResponse.json(expense, { status: 201 });
 }

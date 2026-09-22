@@ -41,7 +41,18 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
   const [generatingSku, setGeneratingSku] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState('');
+  const [query, setQuery] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const filteredList = list.filter((item) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      item.sku.toLowerCase().includes(q) ||
+      item.name.toLowerCase().includes(q) ||
+      (item.category ?? '').toLowerCase().includes(q)
+    );
+  });
 
   async function generateSku() {
     setGeneratingSku(true);
@@ -138,6 +149,13 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
       </div>
       {importMsg && <p className="text-sm text-slate-600">{importMsg}</p>}
 
+      <input
+        className="input"
+        placeholder="Search by SKU, name or category…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs uppercase text-slate-500">
@@ -153,7 +171,7 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
           </tr>
         </thead>
         <tbody>
-          {list.map((item) => (
+          {filteredList.map((item) => (
             <tr key={item.id} className="border-t border-slate-100">
               <td className="py-2 font-mono text-xs">{item.sku}</td>
               <td className="py-2">{item.name}</td>

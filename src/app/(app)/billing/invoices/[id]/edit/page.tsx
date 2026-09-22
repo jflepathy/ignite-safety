@@ -20,6 +20,7 @@ export default async function EditInvoicePage({ params }: { params: { id: string
   const initial: InvoiceFormInitial = {
     customerId: invoice.customerId,
     dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : '',
+    poNumber: invoice.poNumber ?? '',
     globalDiscountPercent: Number(invoice.globalDiscountPercent),
     terms: invoice.terms ?? '',
     notes: invoice.notes ?? '',

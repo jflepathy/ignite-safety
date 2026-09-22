@@ -43,7 +43,9 @@ const CreateCustomerSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireRole('ADMIN', 'SALES');
+  // Technicians can add a brand-new customer on the spot when creating an
+  // ad-hoc Work Order on site (Session 11).
+  const { error } = await requireRole('ADMIN', 'SALES', 'TECHNICIAN');
   if (error) return error;
 
   const body = await req.json();

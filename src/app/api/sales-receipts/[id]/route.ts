@@ -82,7 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     };
   }
 
-  const receipt = await prisma.salesReceipt.update({
+  await prisma.salesReceipt.update({
     where: { id: params.id },
     data: {
       ...(data.customerId ? { customerId: data.customerId } : {}),
@@ -90,6 +90,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
       ...totalsPatch,
     },
+  });
+  const receipt = await prisma.salesReceipt.findUnique({
+    where: { id: params.id },
     include: { lineItems: true, customer: true },
   });
 

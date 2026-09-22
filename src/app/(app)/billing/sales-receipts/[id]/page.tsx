@@ -4,6 +4,8 @@ import Link from 'next/link';
 import PrintButton from '@/components/print-button';
 import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument from '@/components/billing/invoice-document';
+import PrintCopies from '@/components/shared/print-copies';
+import DownloadPdfButton from '@/components/shared/download-pdf-button';
 
 export default async function SalesReceiptDetailPage({ params }: { params: { id: string } }) {
   const [receipt, settings] = await Promise.all([
@@ -33,11 +35,16 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
           <Link href="/billing/sales-receipts" className="btn-secondary">
             ← Back
           </Link>
+          <Link href={`/billing/sales-receipts/${receipt.id}/edit`} className="btn-secondary">
+            Edit
+          </Link>
           <PrintButton />
+          <DownloadPdfButton targetId="pdf-document" fileName={receipt.receiptNumber} />
         </div>
       </div>
 
       <div className="print-area">
+       <PrintCopies copies={1} id="pdf-document">
         <InvoiceDocument
           settings={{
             companyName: settings?.companyName ?? 'Ignite Safety',
@@ -78,6 +85,7 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
           amountPaid={receipt.total.toString()}
           balanceDue="0"
         />
+       </PrintCopies>
       </div>
     </div>
   );

@@ -100,12 +100,14 @@ export default function OutreachClient({
   scheduledCount,
   technicians,
   pendingRequests,
+  workshopAddress,
 }: {
   customers: Customer[];
   initialRows: OutreachRow[];
   scheduledCount: number;
   technicians: Technician[];
   pendingRequests: PendingRequest[];
+  workshopAddress?: string | null;
 }) {
   const router = useRouter();
   const [rows] = useState(initialRows);
@@ -312,6 +314,7 @@ export default function OutreachClient({
           initialCustomerId={wizard.customerId}
           initialSourceEquipmentId={wizard.equipmentId}
           onClose={() => setWizard(null)}
+          workshopAddress={workshopAddress}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ import ShareLinkButton from '@/components/shared/share-link-button';
 import AttachmentsPanel from '@/components/shared/attachments-panel';
 import InvoiceDocument from '@/components/billing/invoice-document';
 import PrintCopies from '@/components/shared/print-copies';
+import DownloadPdfButton from '@/components/shared/download-pdf-button';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts] = await Promise.all([
@@ -67,6 +68,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             Edit
           </Link>
           <PrintButton />
+          <DownloadPdfButton targetId="pdf-document" fileName={invoice.invoiceNumber} />
           <RecordPaymentForm
             invoiceId={invoice.id}
             balanceDue={Number(invoice.balanceDue)}
@@ -78,7 +80,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
       </div>
 
       <div className="print-area">
-       <PrintCopies copies={2}>
+       <PrintCopies copies={1} id="pdf-document">
         <InvoiceDocument
           settings={{
             companyName: settings?.companyName ?? 'Ignite Safety',
@@ -95,6 +97,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           documentNumber={invoice.invoiceNumber}
           issueDate={invoice.issueDate.toLocaleDateString()}
           dueDate={invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null}
+          poNumber={invoice.poNumber}
           terms={invoice.terms}
           customer={{
             displayName: invoice.customer.displayName,
