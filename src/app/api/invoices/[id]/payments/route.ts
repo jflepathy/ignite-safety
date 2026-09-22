@@ -6,6 +6,7 @@ import { z } from 'zod';
 const PaymentSchema = z.object({
   amount: z.number().positive(),
   method: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']),
+  bankAccountId: z.string().min(1, 'Select which account this payment was deposited into'),
   reference: z.string().optional(),
   notes: z.string().optional(),
   paidAt: z.string().optional(),
@@ -23,16 +24,28 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: true } });
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  const bankAccount = await prisma.bankAccount.findUnique({ where: { id: data.bankAccountId } });
+  if (!bankAccount) return NextResponse.json({ error: 'That account no longer exists' }, { status: 400 });
+
   const payment = await prisma.payment.create({
     data: {
       invoiceId: params.id,
       amount: data.amount,
       method: data.method,
+      bankAccountId: data.bankAccountId,
       reference: data.reference,
       notes: data.notes,
       paidAt: data.paidAt ? new Date(data.paidAt) : new Date(),
       recordedById: session!.user.id,
     },
+  });
+
+  // Sequential write, not $transaction() -- the Neon HTTP driver adapter
+  // doesn't support it (see the numbering/deposits routes for the same
+  // pattern). The balance bump is a single atomic `increment`.
+  await prisma.bankAccount.update({
+    where: { id: data.bankAccountId },
+    data: { currentBalance: { increment: data.amount } },
   });
 
   const totalPaid = [...invoice.payments, payment].reduce((s, p) => s + Number(p.amount), 0);

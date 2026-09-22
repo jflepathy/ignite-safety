@@ -18,6 +18,10 @@ type Settings = {
   logoUrl: string | null;
   faviconUrl: string | null;
   invoiceTermsDefault: string | null;
+  paymentInstructions: string | null;
+  bankName: string | null;
+  bankAccountName: string | null;
+  bankAccountNumber: string | null;
   chartOfAccountsLimit: number | null;
   billableUserLimit: number | null;
   customKpiLimit: number | null;
@@ -147,6 +151,45 @@ export default function BusinessSettingsForm({ settings }: { settings: Settings 
               rows={2}
               value={form.invoiceTermsDefault ?? ''}
               onChange={(e) => setForm({ ...form, invoiceTermsDefault: e.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="card space-y-4 p-6">
+        <h2 className="text-sm font-semibold text-ink-900">Payment &amp; Bank Details</h2>
+        <p className="text-sm text-slate-500">
+          Printed on every invoice, estimate and sales receipt, below the TIN.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="label">Payment Methods (freeform text)</label>
+            <textarea
+              className="input"
+              rows={3}
+              value={form.paymentInstructions ?? ''}
+              onChange={(e) => setForm({ ...form, paymentInstructions: e.target.value })}
+              placeholder={'1. Cash\n2. Credit / Debit Card\n3. Cheque\n4. Bank Transfer\n5. Approved PO'}
+            />
+          </div>
+          <div>
+            <label className="label">Bank Name</label>
+            <input className="input" value={form.bankName ?? ''} onChange={(e) => setForm({ ...form, bankName: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Bank Account Name</label>
+            <input
+              className="input"
+              value={form.bankAccountName ?? ''}
+              onChange={(e) => setForm({ ...form, bankAccountName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Bank Account Number</label>
+            <input
+              className="input"
+              value={form.bankAccountNumber ?? ''}
+              onChange={(e) => setForm({ ...form, bankAccountNumber: e.target.value })}
             />
           </div>
         </div>

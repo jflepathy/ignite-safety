@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
 import RecordPaymentForm from '@/components/billing/record-payment-form';
@@ -8,19 +9,21 @@ import PrintOnLoad from '@/components/shared/print-on-load';
 import ShareLinkButton from '@/components/shared/share-link-button';
 import AttachmentsPanel from '@/components/shared/attachments-panel';
 import InvoiceDocument from '@/components/billing/invoice-document';
+import PrintCopies from '@/components/shared/print-copies';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
-  const [invoice, settings] = await Promise.all([
+  const [invoice, settings, bankAccounts] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: params.id },
       include: {
         customer: true,
         lineItems: { include: { taxRate: true, shopItem: true }, orderBy: { sortOrder: 'asc' } },
-        payments: { orderBy: { paidAt: 'desc' } },
+        payments: { orderBy: { paidAt: 'desc' }, include: { bankAccount: true } },
         workOrder: true,
       },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    prisma.bankAccount.findMany({ orderBy: { name: 'asc' } }),
   ]);
   if (!invoice) notFound();
 
@@ -60,17 +63,22 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
         <div className="flex items-center gap-3">
           {invoice.shareToken && <ShareLinkButton path={`/share/invoice/${invoice.shareToken}`} />}
+          <Link href={`/billing/invoices/${invoice.id}/edit`} className="btn-secondary">
+            Edit
+          </Link>
           <PrintButton />
           <RecordPaymentForm
             invoiceId={invoice.id}
             balanceDue={Number(invoice.balanceDue)}
             currency={currency}
             allowedMethods={allowedMethods}
+            bankAccounts={bankAccounts.map((a) => ({ id: a.id, name: a.name }))}
           />
         </div>
       </div>
 
       <div className="print-area">
+       <PrintCopies copies={2}>
         <InvoiceDocument
           settings={{
             companyName: settings?.companyName ?? 'Ignite Safety',
@@ -114,6 +122,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           taxInclusive={invoice.taxInclusive}
           customerMessage={invoice.customerMessage}
         />
+       </PrintCopies>
       </div>
 
       <AttachmentsPanel
@@ -136,6 +145,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
               <tr className="text-left text-xs uppercase text-slate-500">
                 <th className="py-2">Date</th>
                 <th className="py-2">Method</th>
+                <th className="py-2">Deposited To</th>
                 <th className="py-2">Reference</th>
                 <th className="py-2 text-right">Amount</th>
               </tr>
@@ -145,6 +155,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
                 <tr key={p.id} className="border-t border-slate-100">
                   <td className="py-2">{p.paidAt.toLocaleDateString()}</td>
                   <td className="py-2">{p.method.replace('_', ' ')}</td>
+                  <td className="py-2 text-slate-500">{(p as any).bankAccount?.name ?? '—'}</td>
                   <td className="py-2 text-slate-500">{p.reference ?? '—'}</td>
                   <td className="py-2 text-right font-medium">{formatMoney(p.amount.toString(), currency)}</td>
                 </tr>

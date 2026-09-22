@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
+import CustomerCombobox from '@/components/shared/customer-combobox';
 
 type Customer = { id: string; displayName: string };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
@@ -43,10 +44,12 @@ export default function EstimateForm({
 }) {
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
+  const [customerOptions, setCustomerOptions] = useState(customers);
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [expiryDate, setExpiryDate] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [printAfterSave, setPrintAfterSave] = useState(true);
   const [submitting, setSubmitting] = useState<'save' | 'print' | null>(null);
   const [error, setError] = useState('');
 
@@ -106,11 +109,8 @@ export default function EstimateForm({
       });
       if (!res.ok) throw new Error('Failed to create estimate');
       const estimate = await res.json();
-      if (action === 'print') {
-        router.push(`/billing/estimates/${estimate.id}?print=1`);
-      } else {
-        router.push(`/billing/estimates/${estimate.id}`);
-      }
+      const shouldPrint = action === 'print' || printAfterSave;
+      router.push(`/billing/estimates/${estimate.id}${shouldPrint ? '?print=1' : ''}`);
       router.refresh();
     } catch (e: any) {
       setError(e.message);
@@ -122,14 +122,12 @@ export default function EstimateForm({
     <div className="space-y-6">
       <div className="card grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
         <div>
-          <label className="label">Customer</label>
-          <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.displayName}
-              </option>
-            ))}
-          </select>
+          <CustomerCombobox
+            customers={customerOptions.map((c) => ({ id: c.id, name: c.displayName }))}
+            value={customerId}
+            onChange={setCustomerId}
+            onCreated={(c) => setCustomerOptions((prev) => [...prev, { id: c.id, displayName: c.name }])}
+          />
         </div>
         <div>
           <label className="label">Expiry Date</label>
@@ -239,13 +237,24 @@ export default function EstimateForm({
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
-          {submitting === 'save' ? 'Saving…' : 'Save'}
-        </button>
-        <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
-          {submitting === 'print' ? 'Saving…' : 'Save & Print'}
-        </button>
+      <div className="flex items-center justify-end gap-4">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300"
+            checked={printAfterSave}
+            onChange={(e) => setPrintAfterSave(e.target.checked)}
+          />
+          Print after saving
+        </label>
+        <div className="flex gap-2">
+          <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
+            {submitting === 'save' ? 'Saving…' : 'Save'}
+          </button>
+          <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
+            {submitting === 'print' ? 'Saving…' : 'Save & Print'}
+          </button>
+        </div>
       </div>
     </div>
   );

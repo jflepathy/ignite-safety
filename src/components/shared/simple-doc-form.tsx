@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import CustomerCombobox from '@/components/shared/customer-combobox';
 
 export type PartyOption = { id: string; name: string };
 export type ShopItemOption = { id: string; sku: string; name: string; unitPrice: string };
@@ -40,6 +41,11 @@ export default function SimpleDocForm({
   submitLabel = 'Save',
   printableDetailPath,
   documentLabel = 'Document',
+  enablePartyCombobox = false,
+  printAfterSaveDefault = false,
+  mode = 'create',
+  recordId,
+  initial,
 }: {
   title: string;
   partyLabel: string; // "Customer" or "Supplier"
@@ -59,11 +65,26 @@ export default function SimpleDocForm({
    * print-ready detail page, e.g. Credit Notes, Bills, Purchase Orders). */
   printableDetailPath?: string;
   documentLabel?: string;
+  /** Swaps the plain party <select> for the type-to-filter combobox with
+   * inline "+ Add new customer" (Session 10). Only meaningful when the
+   * party is a Customer (it POSTs to /api/customers) — leave off for
+   * Supplier-context forms like Bill/Purchase Order. */
+  enablePartyCombobox?: boolean;
+  /** Pre-checks "Print after saving" (Session 10). Only has an effect when
+   * printableDetailPath is set, since that's what makes printing possible. */
+  printAfterSaveDefault?: boolean;
+  /** 'edit' loads from `initial` and PATCHes `apiUrl/recordId` instead of
+   * POSTing a new record (Session 10 — Sales Receipt edit). */
+  mode?: 'create' | 'edit';
+  recordId?: string;
+  initial?: { partyId?: string; lines?: Line[]; extraValues?: Record<string, any> };
 }) {
   const router = useRouter();
-  const [partyId, setPartyId] = useState(parties[0]?.id ?? '');
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
-  const [extraValues, setExtraValues] = useState<Record<string, any>>({});
+  const [partyId, setPartyId] = useState(initial?.partyId ?? parties[0]?.id ?? '');
+  const [partyOptions, setPartyOptions] = useState(parties);
+  const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
+  const [extraValues, setExtraValues] = useState<Record<string, any>>(initial?.extraValues ?? {});
+  const [printAfterSave, setPrintAfterSave] = useState(printAfterSaveDefault);
   const [submitting, setSubmitting] = useState<'save' | 'print' | null>(null);
   const [error, setError] = useState('');
 
@@ -98,9 +119,10 @@ export default function SimpleDocForm({
     setSubmitting(action);
     setError('');
     try {
+      const isEdit = mode === 'edit';
       const extra = buildExtraPayload ? buildExtraPayload(extraValues) : extraValues;
-      const res = await fetch(apiUrl, {
-        method: 'POST',
+      const res = await fetch(isEdit ? `${apiUrl}/${recordId}` : apiUrl, {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...extra,
@@ -120,8 +142,13 @@ export default function SimpleDocForm({
         throw new Error(body?.error ? JSON.stringify(body.error) : 'Failed to save');
       }
       const saved = await res.json().catch(() => null);
-      if (printableDetailPath && saved?.id) {
-        router.push(`${printableDetailPath}/${saved.id}${action === 'print' ? '?print=1' : ''}`);
+      if (isEdit && recordId) {
+        const shouldPrint = action === 'print' || printAfterSave;
+        router.push(`${printableDetailPath ?? redirectPath}/${recordId}${shouldPrint && printableDetailPath ? '?print=1' : ''}`);
+        router.refresh();
+      } else if (printableDetailPath && saved?.id) {
+        const shouldPrint = action === 'print' || printAfterSave;
+        router.push(`${printableDetailPath}/${saved.id}${shouldPrint ? '?print=1' : ''}`);
         router.refresh();
       } else {
         router.push(redirectPath);
@@ -137,14 +164,26 @@ export default function SimpleDocForm({
     <div className="space-y-6">
       <div className="card grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
         <div>
-          <label className="label">{partyLabel}</label>
-          <select className="input" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
-            {parties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {enablePartyCombobox ? (
+            <CustomerCombobox
+              customers={partyOptions.map((p) => ({ id: p.id, name: p.name }))}
+              value={partyId}
+              onChange={setPartyId}
+              onCreated={(c) => setPartyOptions((prev) => [...prev, { id: c.id, name: c.name }])}
+              label={partyLabel}
+            />
+          ) : (
+            <>
+              <label className="label">{partyLabel}</label>
+              <select className="input" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+                {partyOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
         {extraFields?.({ values: extraValues, set: setExtra })}
       </div>
@@ -250,21 +289,38 @@ export default function SimpleDocForm({
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-2">
-        {printableDetailPath ? (
-          <>
-            <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
-              {submitting === 'save' ? 'Saving…' : 'Save'}
-            </button>
-            <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
-              {submitting === 'print' ? 'Saving…' : 'Save & Print'}
-            </button>
-          </>
-        ) : (
-          <button className="btn-primary" disabled={!!submitting} onClick={() => submit('save')}>
-            {submitting === 'save' ? 'Saving…' : submitLabel}
-          </button>
+      <div className="flex items-center justify-end gap-4">
+        {printableDetailPath && (
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={printAfterSave}
+              onChange={(e) => setPrintAfterSave(e.target.checked)}
+            />
+            Print after saving
+          </label>
         )}
+        <div className="flex gap-2">
+          {mode === 'edit' ? (
+            <button className="btn-primary" disabled={!!submitting} onClick={() => submit('save')}>
+              {submitting === 'save' ? 'Saving…' : 'Save Changes'}
+            </button>
+          ) : printableDetailPath ? (
+            <>
+              <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
+                {submitting === 'save' ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
+                {submitting === 'print' ? 'Saving…' : 'Save & Print'}
+              </button>
+            </>
+          ) : (
+            <button className="btn-primary" disabled={!!submitting} onClick={() => submit('save')}>
+              {submitting === 'save' ? 'Saving…' : submitLabel}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

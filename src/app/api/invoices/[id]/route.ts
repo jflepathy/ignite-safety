@@ -32,11 +32,15 @@ const LineItemSchema = z.object({
 });
 
 const UpdateSchema = z.object({
+  customerId: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'SENT', 'PARTIAL', 'PAID', 'OVERDUE', 'VOID']).optional(),
   dueDate: z.string().optional().nullable(),
   globalDiscountPercent: z.number().min(0).max(100).optional(),
   terms: z.string().optional(),
   notes: z.string().optional(),
+  customerMessage: z.string().optional(),
+  taxInclusive: z.boolean().optional(),
+  customerPaymentOptions: z.record(z.boolean()).optional(),
   lineItems: z.array(LineItemSchema).optional(),
 });
 
@@ -61,7 +65,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         discountPercent: li.discountPercent,
         taxRatePercent: li.taxRatePercent,
       })),
-      data.globalDiscountPercent ?? Number(existing.globalDiscountPercent)
+      data.globalDiscountPercent ?? Number(existing.globalDiscountPercent),
+      data.taxInclusive ?? existing.taxInclusive
     );
     const amountPaid = existing.payments.reduce((s, p) => s + Number(p.amount), 0);
     // createMany() requires a transaction under the Neon HTTP adapter, same
@@ -96,6 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const invoice = await prisma.invoice.update({
     where: { id: params.id },
     data: {
+      ...(data.customerId ? { customerId: data.customerId } : {}),
       ...(data.status ? { status: data.status } : {}),
       ...(data.dueDate !== undefined ? { dueDate: data.dueDate ? new Date(data.dueDate) : null } : {}),
       ...(data.globalDiscountPercent !== undefined
@@ -103,6 +109,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         : {}),
       ...(data.terms !== undefined ? { terms: data.terms } : {}),
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
+      ...(data.customerMessage !== undefined ? { customerMessage: data.customerMessage } : {}),
+      ...(data.taxInclusive !== undefined ? { taxInclusive: data.taxInclusive } : {}),
+      ...(data.customerPaymentOptions !== undefined ? { customerPaymentOptions: data.customerPaymentOptions } : {}),
       ...totalsPatch,
     },
     include: { lineItems: true, customer: true, payments: true },

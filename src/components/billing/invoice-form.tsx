@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
+import CustomerCombobox from '@/components/shared/customer-combobox';
 
 type Customer = { id: string; displayName: string };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
@@ -38,6 +39,22 @@ const FREQUENCIES = [
   { value: 'ANNUALLY', label: 'Annually' },
 ];
 
+export type InvoiceFormInitial = {
+  customerId: string;
+  dueDate: string;
+  globalDiscountPercent: number;
+  terms: string;
+  notes: string;
+  customerMessage: string;
+  taxInclusive: boolean;
+  paymentOptions: { card: boolean; bankTransfer: boolean; cash: boolean };
+  lines: Line[];
+  /** The invoice's actual issue date, used only to recompute the due date if
+   * the user changes the Terms preset while editing. Omit on create (today
+   * is used instead). */
+  issueDateForDueCalc?: string;
+};
+
 export default function InvoiceForm({
   customers,
   shopItems,
@@ -46,6 +63,9 @@ export default function InvoiceForm({
   defaultCustomerId,
   defaultTerms,
   workOrderId,
+  mode = 'create',
+  invoiceId,
+  initial,
 }: {
   customers: Customer[];
   shopItems: ShopItem[];
@@ -54,31 +74,60 @@ export default function InvoiceForm({
   defaultCustomerId?: string;
   defaultTerms?: string;
   workOrderId?: string;
+  /** 'edit' loads from `initial` and PATCHes `invoiceId` instead of POSTing a new invoice. */
+  mode?: 'create' | 'edit';
+  invoiceId?: string;
+  initial?: InvoiceFormInitial;
 }) {
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
 
-  const [customerId, setCustomerId] = useState(defaultCustomerId ?? customers[0]?.id ?? '');
-  const [dueDate, setDueDate] = useState('');
-  const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
-  const [termsPreset, setTermsPreset] = useState(defaultTerms && !TERMS_PRESETS.includes(defaultTerms) ? 'Custom' : defaultTerms || 'Due on Receipt');
-  const [terms, setTerms] = useState(defaultTerms ?? 'Due on Receipt');
-  const [notes, setNotes] = useState('');
-  const [customerMessage, setCustomerMessage] = useState('Thank you for your business!');
-  const [taxInclusive, setTaxInclusive] = useState(false);
-  const [paymentOptions, setPaymentOptions] = useState({ card: true, bankTransfer: true, cash: true });
+  const [customerOptions, setCustomerOptions] = useState(customers);
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? defaultCustomerId ?? customers[0]?.id ?? '');
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? '');
+  const [globalDiscountPercent, setGlobalDiscountPercent] = useState(initial?.globalDiscountPercent ?? 0);
+  const initialTerms = initial?.terms ?? defaultTerms ?? 'Due on Receipt';
+  const [termsPreset, setTermsPreset] = useState(TERMS_PRESETS.includes(initialTerms) ? initialTerms : 'Custom');
+  const [terms, setTerms] = useState(initialTerms);
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [customerMessage, setCustomerMessage] = useState(initial?.customerMessage ?? 'Thank you for your business!');
+  const [taxInclusive, setTaxInclusive] = useState(initial?.taxInclusive ?? false);
+  const [paymentOptions, setPaymentOptions] = useState(initial?.paymentOptions ?? { card: true, bankTransfer: true, cash: true });
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState('MONTHLY');
   const [status, setStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
-  const [printAfterSave, setPrintAfterSave] = useState(false);
-  const [submitting, setSubmitting] = useState<'DRAFT' | 'SENT' | null>(null);
+  const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
+  const [printAfterSave, setPrintAfterSave] = useState(true);
+  const [submitting, setSubmitting] = useState<'DRAFT' | 'SENT' | 'EDIT' | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Net 15 / Net 30 / Net 60 auto-calculate the due date from the issue
+  // date (today, for a new invoice); "Due on Receipt" clears it back to
+  // today; "Custom" leaves whatever due date is already set alone.
+  const NET_TERMS_DAYS: Record<string, number> = { 'Net 15': 15, 'Net 30': 30, 'Net 60': 60 };
   function selectTermsPreset(preset: string) {
     setTermsPreset(preset);
-    if (preset !== 'Custom') setTerms(preset);
+    if (preset === 'Custom') return;
+    setTerms(preset);
+    const base = initial?.issueDateForDueCalc ? new Date(initial.issueDateForDueCalc) : new Date();
+    if (preset in NET_TERMS_DAYS) {
+      const due = new Date(base);
+      due.setDate(due.getDate() + NET_TERMS_DAYS[preset]);
+      setDueDate(due.toISOString().slice(0, 10));
+    } else if (preset === 'Due on Receipt') {
+      setDueDate(base.toISOString().slice(0, 10));
+    }
   }
+
+  // On a brand-new invoice, if a default term (e.g. Net 30 from the
+  // customer's saved terms) came in, apply the same auto-calc once so the
+  // due date isn't left blank until the user touches the dropdown.
+  useEffect(() => {
+    if (mode === 'create' && !initial?.dueDate && termsPreset in NET_TERMS_DAYS) {
+      selectTermsPreset(termsPreset);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -118,42 +167,59 @@ export default function InvoiceForm({
     );
   }, [lines, globalDiscountPercent, taxRates, taxInclusive]);
 
-  async function handleSubmit(asStatus: 'DRAFT' | 'SENT') {
+  async function handleSubmit(asStatus: 'DRAFT' | 'SENT' | 'EDIT') {
     setSubmitting(asStatus);
     setErrorMsg('');
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
+      const lineItems = lines.map((l) => ({
+        shopItemId: l.shopItemId,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        discountPercent: l.discountPercent,
+        taxRateId: l.taxRateId,
+        taxRatePercent: l.taxRateId
+          ? parseFloat(taxRates.find((t) => t.id === l.taxRateId)?.ratePercent ?? '0')
+          : 0,
+      }));
+
+      const isEdit = mode === 'edit';
+      const res = await fetch(isEdit ? `/api/invoices/${invoiceId}` : '/api/invoices', {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId,
-          workOrderId: workOrderId ?? null,
-          dueDate: dueDate || undefined,
-          globalDiscountPercent,
-          terms,
-          notes,
-          customerMessage,
-          taxInclusive,
-          customerPaymentOptions: paymentOptions,
-          isRecurring,
-          recurringFrequency: isRecurring ? recurringFrequency : undefined,
-          status: asStatus,
-          lineItems: lines.map((l) => ({
-            shopItemId: l.shopItemId,
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            discountPercent: l.discountPercent,
-            taxRateId: l.taxRateId,
-            taxRatePercent: l.taxRateId
-              ? parseFloat(taxRates.find((t) => t.id === l.taxRateId)?.ratePercent ?? '0')
-              : 0,
-          })),
-        }),
+        body: JSON.stringify(
+          isEdit
+            ? {
+                customerId,
+                dueDate: dueDate || null,
+                globalDiscountPercent,
+                terms,
+                notes,
+                customerMessage,
+                taxInclusive,
+                customerPaymentOptions: paymentOptions,
+                lineItems,
+              }
+            : {
+                customerId,
+                workOrderId: workOrderId ?? null,
+                dueDate: dueDate || undefined,
+                globalDiscountPercent,
+                terms,
+                notes,
+                customerMessage,
+                taxInclusive,
+                customerPaymentOptions: paymentOptions,
+                isRecurring,
+                recurringFrequency: isRecurring ? recurringFrequency : undefined,
+                status: asStatus,
+                lineItems,
+              }
+        ),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ? JSON.stringify(body.error) : 'Failed to create invoice');
+        throw new Error(body?.error ? JSON.stringify(body.error) : `Failed to ${isEdit ? 'save' : 'create'} invoice`);
       }
       const invoice = await res.json();
       router.push(`/billing/invoices/${invoice.id}${printAfterSave ? '?print=1' : ''}`);
@@ -168,14 +234,12 @@ export default function InvoiceForm({
     <div className="space-y-6">
       <div className="card grid grid-cols-1 gap-4 p-6 sm:grid-cols-3">
         <div>
-          <label className="label">Customer</label>
-          <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.displayName}
-              </option>
-            ))}
-          </select>
+          <CustomerCombobox
+            customers={customerOptions.map((c) => ({ id: c.id, name: c.displayName }))}
+            value={customerId}
+            onChange={setCustomerId}
+            onCreated={(c) => setCustomerOptions((prev) => [...prev, { id: c.id, displayName: c.name }])}
+          />
         </div>
         <div>
           <label className="label">Due Date</label>
@@ -458,22 +522,35 @@ export default function InvoiceForm({
           Print after saving
         </label>
         <div className="flex gap-3">
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={!!submitting}
-            onClick={() => handleSubmit('DRAFT')}
-          >
-            {submitting === 'DRAFT' ? 'Saving…' : 'Save as Draft'}
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!!submitting}
-            onClick={() => handleSubmit('SENT')}
-          >
-            {submitting === 'SENT' ? 'Saving…' : 'Save & Mark as Sent'}
-          </button>
+          {mode === 'edit' ? (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!!submitting}
+              onClick={() => handleSubmit('EDIT')}
+            >
+              {submitting === 'EDIT' ? 'Saving…' : 'Save Changes'}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={!!submitting}
+                onClick={() => handleSubmit('DRAFT')}
+              >
+                {submitting === 'DRAFT' ? 'Saving…' : 'Save as Draft'}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!!submitting}
+                onClick={() => handleSubmit('SENT')}
+              >
+                {submitting === 'SENT' ? 'Saving…' : 'Save & Mark as Sent'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

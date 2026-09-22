@@ -79,7 +79,10 @@ export default function InvoiceDocument({
   const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white text-ink-900 print:rounded-none print:border-0">
+    <div
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white text-ink-900 print:rounded-none print:border-0"
+      style={{ fontFamily: 'Arial, Helvetica, "Helvetica Neue", sans-serif' }}
+    >
       {/* Company header band */}
       <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-slate-50/60 p-8 print:bg-white">
         <div>
@@ -90,7 +93,7 @@ export default function InvoiceDocument({
         </div>
         {settings.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.logoUrl} alt={settings.companyName} className="h-16 object-contain" />
+          <img src={settings.logoUrl} alt={settings.companyName} className="h-24 object-contain" />
         ) : (
           <div className="flex items-center gap-2 text-2xl font-bold tracking-wide">
             <span className="text-brand-600">{settings.companyName.split(' ')[0]?.toUpperCase()}</span>
@@ -180,14 +183,17 @@ export default function InvoiceDocument({
           <div className="max-w-xs text-xs leading-relaxed text-slate-500">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Payment Methods</p>
             <p className="whitespace-pre-line">{settings.paymentInstructions}</p>
-            {settings.bankName && (
-              <p className="mt-2 whitespace-pre-line">
-                Bank: {settings.bankName}
-                {settings.bankAccountName && `\nName: ${settings.bankAccountName}`}
-                {settings.bankAccountNumber && `\nAcc No.: ${settings.bankAccountNumber}`}
-              </p>
-            )}
             {settings.taxRegistrationNumber && <p className="mt-2 font-medium text-slate-600">TIN: {settings.taxRegistrationNumber}</p>}
+            {settings.bankName && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Bank Details</p>
+                <p className="whitespace-pre-line">
+                  {settings.bankName}
+                  {settings.bankAccountName && `\n${settings.bankAccountName}`}
+                  {settings.bankAccountNumber && `\nAcc No.: ${settings.bankAccountNumber}`}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="w-full space-y-1 text-sm sm:w-72">

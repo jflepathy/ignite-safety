@@ -9,11 +9,21 @@ export default function SalesReceiptFormClient({
   shopItems,
   taxRates,
   currency,
+  mode = 'create',
+  recordId,
+  initial,
 }: {
   customers: PartyOption[];
   shopItems: ShopItemOption[];
   taxRates: TaxRateOption[];
   currency: string;
+  mode?: 'create' | 'edit';
+  recordId?: string;
+  initial?: {
+    partyId?: string;
+    lines?: { key: string; shopItemId: string | null; description: string; quantity: number; unitPrice: number; taxRateId: string | null }[];
+    extraValues?: Record<string, any>;
+  };
 }) {
   return (
     <SimpleDocForm
@@ -27,6 +37,11 @@ export default function SalesReceiptFormClient({
       redirectPath="/billing/sales-receipts"
       printableDetailPath="/billing/sales-receipts"
       documentLabel="Sales Receipt"
+      enablePartyCombobox
+      printAfterSaveDefault
+      mode={mode}
+      recordId={recordId}
+      initial={initial}
       extraFields={({ values, set }) => (
         <div>
           <label className="label">Payment Method</label>

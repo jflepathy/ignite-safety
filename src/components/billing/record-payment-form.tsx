@@ -8,30 +8,40 @@ export default function RecordPaymentForm({
   balanceDue,
   currency,
   allowedMethods,
+  bankAccounts,
 }: {
   invoiceId: string;
   balanceDue: number;
   currency: string;
   allowedMethods: string[];
+  bankAccounts: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(balanceDue);
   const [method, setMethod] = useState(allowedMethods[0] ?? 'CASH');
+  const [bankAccountId, setBankAccountId] = useState(bankAccounts[0]?.id ?? '');
   const [reference, setReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   async function submit() {
+    if (!bankAccountId) {
+      setError('Select which account this payment was deposited into.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
       const res = await fetch(`/api/invoices/${invoiceId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, method, reference }),
+        body: JSON.stringify({ amount, method, bankAccountId, reference }),
       });
-      if (!res.ok) throw new Error('Failed to record payment');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error?.formErrors?.[0] ?? body?.error ?? 'Failed to record payment');
+      }
       setOpen(false);
       router.refresh();
     } catch (e: any) {
@@ -75,6 +85,20 @@ export default function RecordPaymentForm({
         </select>
       </div>
       <div>
+        <label className="label">Deposit To</label>
+        {bankAccounts.length > 0 ? (
+          <select className="input" value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)}>
+            {bankAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-xs text-red-600">No bank accounts set up yet — add one under Accounting first.</p>
+        )}
+      </div>
+      <div>
         <label className="label">Reference (optional)</label>
         <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} />
       </div>
@@ -83,7 +107,7 @@ export default function RecordPaymentForm({
         <button className="btn-secondary" onClick={() => setOpen(false)}>
           Cancel
         </button>
-        <button className="btn-primary" disabled={submitting} onClick={submit}>
+        <button className="btn-primary" disabled={submitting || bankAccounts.length === 0} onClick={submit}>
           {submitting ? 'Saving…' : 'Save Payment'}
         </button>
       </div>

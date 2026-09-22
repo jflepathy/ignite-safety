@@ -783,6 +783,7 @@ model BankAccount {
 
   transactions BankTransaction[]
   deposits     Deposit[]
+  payments     Payment[]
 
   @@map("bank_accounts")
 }
@@ -1221,19 +1222,26 @@ model CreditNoteLineItem {
 }
 
 model Payment {
-  id           String        @id @default(cuid())
-  invoiceId    String
-  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  amount       Decimal       @db.Decimal(12, 2)
-  method       PaymentMethod @default(CASH)
-  reference    String?
-  paidAt       DateTime      @default(now())
-  notes        String?
-  recordedById String?
-  recordedBy   User?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
-  createdAt    DateTime      @default(now())
+  id            String        @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount        Decimal       @db.Decimal(12, 2)
+  method        PaymentMethod @default(CASH)
+  reference     String?
+  paidAt        DateTime      @default(now())
+  notes         String?
+  // Which bank account this payment was deposited into. Required in the UI
+  // (Session 10) so recorded payments actually move the right account's
+  // balance instead of vanishing into an untracked record — see
+  // src/components/billing/record-payment-form.tsx.
+  bankAccountId String?
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  recordedById  String?
+  recordedBy    User?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt     DateTime      @default(now())
 
   @@index([invoiceId])
+  @@index([bankAccountId])
   @@map("payments")
 }
 
