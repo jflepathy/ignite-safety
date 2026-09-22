@@ -124,6 +124,18 @@ export async function POST(req: NextRequest) {
   // transaction Prisma normally wraps a parent+nested-children write in
   // ("Transactions are not supported in HTTP mode"). `createMany` on the
   // child table is a single plain INSERT, so it works fine without one.
+  //
+  // A nested relation *connect* — not just a nested *create* — hits the
+  // same wall: `workOrder: { connect: { id } } }` inside this same
+  // create() call was found (2026-09-22) to throw the identical
+  // "Transactions are not supported in HTTP mode" error whenever an
+  // invoice was created from a Work Order's "Convert to Draft Invoice"
+  // button, since the FK actually lives on WorkOrder.invoiceId — so
+  // Prisma's connect is really an update to that other row, wrapped in
+  // the same unsupported implicit transaction. Fixed the same way as
+  // every other instance of this bug: create the invoice with no nested
+  // relation write at all, then set WorkOrder.invoiceId with its own
+  // plain update() afterward.
   const createdInvoice = await prisma.invoice.create({
     data: {
       invoiceNumber,
@@ -147,11 +159,15 @@ export async function POST(req: NextRequest) {
       isRecurring: data.isRecurring,
       recurringTemplateId,
       createdById: session!.user.id,
-      ...(data.workOrderId
-        ? { workOrder: { connect: { id: data.workOrderId } } }
-        : {}),
     },
   });
+
+  if (data.workOrderId) {
+    await prisma.workOrder.update({
+      where: { id: data.workOrderId },
+      data: { invoiceId: createdInvoice.id },
+    });
+  }
 
   // createMany() ALSO goes through the same implicit-transaction path as
   // nested writes under the Neon HTTP adapter (confirmed by direct testing
