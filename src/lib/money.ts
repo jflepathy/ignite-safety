@@ -119,13 +119,16 @@ export function integerToWords(value: number): string {
   return chunks.join(' ');
 }
 
-/** "One Hundred Forty-Eight and 50/100 SCR" — the cheque-writing style
- * amount-in-words shown to a technician collecting a cheque payment. */
+/** "One Hundred Only SCR" (no cents) / "One Hundred Cents Ten Only SCR"
+ * (with cents) — the cheque-writing style amount-in-words shown to a
+ * technician collecting a cheque payment. */
 export function amountInWords(amount: number, currency = 'SCR'): string {
   const rounded = Math.round(amount * 100) / 100;
   const whole = Math.floor(rounded);
   const cents = Math.round((rounded - whole) * 100);
-  return `${integerToWords(whole)} and ${String(cents).padStart(2, '0')}/100 ${currency}`;
+  return cents > 0
+    ? `${integerToWords(whole)} Cents ${integerToWords(cents)} Only ${currency}`
+    : `${integerToWords(whole)} Only ${currency}`;
 }
 
 export function formatMoney(amount: number | string, currency = 'SCR'): string {

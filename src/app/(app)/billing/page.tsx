@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/money';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import BillingTabsClient from '@/components/billing/billing-tabs-client';
+import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
 
 export default async function BillingPage({
   searchParams,
@@ -41,6 +42,18 @@ export default async function BillingPage({
     include: { customer: true },
     orderBy: { completedAt: 'desc' },
     take: 20,
+  });
+
+  // Cheque/Transfer payments a technician collected in the field (Session
+  // 16 billing bridge) that are still PENDING_REVIEW or MISMATCH — with no
+  // AI key configured, this is the *only* place an admin can act on them,
+  // so it's surfaced right at the top of Billing rather than requiring
+  // anyone to already know which invoice to open.
+  const paymentsToReview = await prisma.payment.findMany({
+    where: { verificationStatus: { in: ['PENDING_REVIEW', 'MISMATCH'] } },
+    include: { invoice: { include: { customer: true } } },
+    orderBy: { paidAt: 'desc' },
+    take: 30,
   });
 
   const outstanding = invoices.reduce((s, i) => s + Number(i.balanceDue), 0);
@@ -83,6 +96,39 @@ export default async function BillingPage({
           <p className="mt-1 text-2xl font-semibold text-emerald-600">{formatMoney(paidThisMonth, curr)}</p>
         </div>
       </div>
+
+      {paymentsToReview.length > 0 && (
+        <div className="card border-amber-200 bg-amber-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-amber-900">
+            Payments awaiting review ({paymentsToReview.length})
+          </h2>
+          <p className="mb-3 text-xs text-amber-700">
+            Cheque / bank transfer payments a technician collected in the field — confirm these match the proof
+            photo to mark the invoice paid and move the money into the bank account.
+          </p>
+          <div className="divide-y divide-amber-100">
+            {paymentsToReview.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <div>
+                  <Link href={`/billing/invoices/${p.invoiceId}`} className="font-medium text-brand-700 hover:underline">
+                    {p.invoice.invoiceNumber}
+                  </Link>
+                  <span className="ml-2 text-slate-500">{p.invoice.customer.displayName}</span>
+                  <span
+                    className={`ml-2 badge ${p.verificationStatus === 'MISMATCH' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}
+                  >
+                    {p.method.replace('_', ' ')} · {p.verificationStatus === 'MISMATCH' ? 'Mismatch' : 'Pending review'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-ink-900">{formatMoney(p.amount.toString(), curr)}</span>
+                  <ConfirmPaymentButton invoiceId={p.invoiceId} paymentId={p.id} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {openWorkOrders.length > 0 && (
         <div className="card p-4">

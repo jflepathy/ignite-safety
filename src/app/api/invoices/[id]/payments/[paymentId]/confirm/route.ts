@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 
 // Admin manual fallback for a technician-collected cheque/transfer payment
-// that's sitting at PENDING_REVIEW (no ANTHROPIC_API_KEY configured yet, or
+// that's sitting at PENDING_REVIEW (no GEMINI_API_KEY configured yet, or
 // the AI pass wasn't confident) or MISMATCH (AI flagged a discrepancy but
 // an admin, having looked at the photo themselves, confirms it's actually
 // fine) — see /api/invoices/[id]/technician-payment. Confirming here is

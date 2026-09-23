@@ -14,10 +14,11 @@ import { z } from 'zod';
 // than letting them pick an account.
 //
 // Cash is CONFIRMED immediately (the technician physically has it in
-// hand). Cheque/Transfer require a photo and start PENDING_REVIEW; if an
-// ANTHROPIC_API_KEY is configured, an AI pass runs synchronously and can
+// hand). Cheque/Transfer require a photo and start PENDING_REVIEW; if a
+// GEMINI_API_KEY is configured, an AI pass runs synchronously and can
 // confirm (or flag MISMATCH) on the spot — otherwise it's left for an
-// admin to confirm by hand from the invoice's Payments panel.
+// admin to confirm by hand from the "Payments awaiting review" card on
+// the Billing page (or the invoice's own Payments panel).
 const Schema = z.object({
   amount: z.number().positive(),
   method: z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER']),
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     if (!result.available) {
       verificationStatus = 'PENDING_REVIEW';
-      proofNotes = 'Awaiting admin review (AI verification not yet configured).';
+      proofNotes = 'Awaiting admin review (AI verification not yet configured — see the "Payments awaiting review" card on Billing).';
     } else if (result.matches && result.confidence !== 'low') {
       verificationStatus = 'CONFIRMED';
       verifiedAt = new Date();
