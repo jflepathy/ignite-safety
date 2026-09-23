@@ -7,6 +7,15 @@ import { formatMoney } from '@/lib/money';
 import { isStaleAssignment } from '@/lib/work-order-status';
 import ShareInvoiceButtons from '@/components/technician/share-invoice-buttons';
 
+const STATUS_STYLES: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-600',
+  SENT: 'bg-blue-100 text-blue-700',
+  PARTIAL: 'bg-amber-100 text-amber-700',
+  PAID: 'bg-emerald-100 text-emerald-700',
+  OVERDUE: 'bg-red-100 text-red-700',
+  VOID: 'bg-slate-100 text-slate-400',
+};
+
 export default async function TechnicianInvoicePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const invoice = await prisma.invoice.findUnique({
@@ -27,6 +36,14 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
   const pendingPayments = invoice.payments.filter(
     (p) => p.verificationStatus === 'PENDING_REVIEW' || p.verificationStatus === 'MISMATCH'
   );
+  // Payments that actually count toward the balance -- confirmed by the AI
+  // pass, by an admin, or recorded directly (verificationStatus NONE, the
+  // normal office-recorded case). Shown so a technician sees a payment
+  // land the moment it's confirmed, not just once the invoice is fully
+  // paid (Session 19).
+  const confirmedPayments = invoice.payments.filter(
+    (p) => p.verificationStatus === 'CONFIRMED' || p.verificationStatus === 'NONE'
+  );
 
   return (
     <div className="space-y-5">
@@ -42,7 +59,7 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
             <p className="text-xs uppercase tracking-wide text-slate-400">Invoice</p>
             <p className="text-lg font-semibold text-ink-900">{invoice.invoiceNumber}</p>
           </div>
-          <span className={`badge ${invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{invoice.status}</span>
+          <span className={`badge ${STATUS_STYLES[invoice.status] ?? 'bg-amber-100 text-amber-700'}`}>{invoice.status}</span>
         </div>
         <p className="mt-1 text-sm text-slate-500">{invoice.customer.displayName}</p>
         {invoice.status === 'DRAFT' && (
@@ -83,6 +100,26 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
         invoiceNumber={invoice.invoiceNumber}
         companyName={settings?.companyName ?? 'Ignite Safety'}
       />
+
+      {confirmedPayments.length > 0 && (
+        <div
+          className={`rounded-xl border p-4 text-sm ${
+            invoice.status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-blue-200 bg-blue-50 text-blue-800'
+          }`}
+        >
+          <p className="font-semibold">
+            {invoice.status === 'PAID' ? '✓ Paid in full' : '✓ Payment received — partially paid'}
+          </p>
+          {confirmedPayments.map((p) => (
+            <p key={p.id} className="mt-1">
+              {p.method.replace('_', ' ')} — {formatMoney(p.amount.toString(), currency)} confirmed
+            </p>
+          ))}
+          {invoice.status !== 'PAID' && (
+            <p className="mt-1 font-medium">Balance still due: {formatMoney(invoice.balanceDue.toString(), currency)}</p>
+          )}
+        </div>
+      )}
 
       {pendingPayments.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

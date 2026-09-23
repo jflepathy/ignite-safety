@@ -27,11 +27,14 @@
   .btn-danger {
     @apply btn bg-red-600 text-white hover:bg-red-700;
   }
+  /* Session 19: denser form fields (smaller text, tighter vertical padding)
+     so a form with a lot of fields (Invoice, Estimate, Customer edit, ...)
+     fits more on screen without scrolling as much. */
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
   }
   .label {
-    @apply mb-1 block text-xs font-medium text-slate-600;
+    @apply mb-0.5 block text-[11px] font-medium text-slate-600;
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;

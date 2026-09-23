@@ -41,9 +41,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
   if (balanceDue <= 0) status = 'PAID';
   else if (totalPaid > 0) status = 'PARTIAL';
 
-  const updated = await prisma.invoice.update({
+  // Plain update, no include -- combining a data write with an include in
+  // one call is the same Neon HTTP adapter transaction limitation found
+  // repeatedly elsewhere in this app (Sessions 8/12/14). This was the
+  // actual bug behind "confirming a payment doesn't update the invoice":
+  // the payment.update and bankAccount.update above committed fine, but
+  // this final call threw ("Transactions are not supported in HTTP
+  // mode"), leaving the payment marked Confirmed while the invoice's own
+  // status/balance silently never changed (Session 19).
+  await prisma.invoice.update({
     where: { id: params.id },
     data: { amountPaid: totalPaid, balanceDue, status },
+  });
+
+  const updated = await prisma.invoice.findUnique({
+    where: { id: params.id },
     include: { payments: true, customer: true, lineItems: true },
   });
 

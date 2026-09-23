@@ -43,6 +43,9 @@ export default async function TechnicianLayout({ children }: { children: React.R
           <Link href="/technician/incentive" className="flex-1 px-4 py-2.5 text-center font-medium text-ink-900 hover:bg-slate-50">
             💰 Incentive
           </Link>
+          <Link href="/technician/invoices" className="flex-1 px-4 py-2.5 text-center font-medium text-ink-900 hover:bg-slate-50">
+            🧾 Invoices
+          </Link>
         </nav>
       )}
       <main className="px-4 py-4 pb-24">{children}</main>

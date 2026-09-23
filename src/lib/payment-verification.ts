@@ -20,7 +20,15 @@
 // auto-confirming the moment the key is added, with no further code
 // changes needed.
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// A stable alias, not a dated version -- "gemini-2.0-flash" (the original
+// model used here) was retired by Google on 2026-06-01, which is why the
+// key the user added still didn't produce automatic verification: every
+// call was silently hitting a dead model and falling back to a MISMATCH
+// with "AI verification call failed (HTTP 404)" in the payment's notes.
+// "gemini-flash-latest" is Google's self-updating alias for the current
+// flash-tier model, so this doesn't need chasing again next time Google
+// retires a dated model name (Session 19).
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 export type PaymentPhotoVerification =
   | { available: false }
