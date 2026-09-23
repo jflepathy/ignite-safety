@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
 
@@ -42,12 +42,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { workOrder: true } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id },
+    include: { workOrder: { include: { additionalTechnicians: true } } },
+  });
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   if (session!.user.role === 'TECHNICIAN') {
     const wo = invoice.workOrder;
-    if (!wo || (wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo))) {
+    if (!wo || !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }

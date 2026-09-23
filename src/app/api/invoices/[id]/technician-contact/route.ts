@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import { z } from 'zod';
 
 // Lets a technician fill in a missing phone number or email straight from
@@ -32,13 +32,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { workOrder: true, customer: true } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id },
+    include: { workOrder: { include: { additionalTechnicians: true } }, customer: true },
+  });
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const isTechnician = session!.user.role === 'TECHNICIAN';
   if (isTechnician) {
     const wo = invoice.workOrder;
-    if (!wo || (wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo))) {
+    if (!wo || !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     if (data.phone && invoice.customer.phone) {

@@ -37,12 +37,19 @@ export default async function TechnicianIncentivePage({ searchParams }: { search
     prisma.incentiveRate.findMany(),
     prisma.workOrder.findMany({
       where: {
-        assignedTechnicianId: session!.user.id,
+        // A job counts toward this technician's incentive whether they're
+        // the primary or one of the admin-added additional technicians on
+        // it (Session 20) -- the earned amount is split equally across
+        // everyone on the job below.
+        OR: [
+          { assignedTechnicianId: session!.user.id },
+          { additionalTechnicians: { some: { technicianId: session!.user.id } } },
+        ],
         deletedAt: null,
         invoiceId: { not: null },
         invoice: { issueDate: { gte: start, lt: end } },
       },
-      include: { invoice: true },
+      include: { invoice: true, additionalTechnicians: true },
       orderBy: { completedAt: 'desc' },
     }),
   ]);
@@ -69,24 +76,30 @@ export default async function TechnicianIncentivePage({ searchParams }: { search
   let totalServiced = 0;
   let totalIncentive = 0;
   const perService = new Map<string, { label: string; quantity: number; incentiveAmount: number }>();
-  const jobRows: { woNumber: string; invoiceNumber: string; date: Date; serviced: number; incentive: number }[] = [];
+  const jobRows: { woNumber: string; invoiceNumber: string; date: Date; serviced: number; incentive: number; splitWith?: number }[] = [];
 
   for (const wo of workOrders) {
     const lines = (wo.serviceLines as unknown as ServiceLine[]) ?? [];
     const results = computeIncentiveForServiceLines(lines, ratesByKey, shopItemsById, defaultFraction);
+    // Split equally across everyone on the job: the primary technician
+    // plus however many additional technicians the admin put on it
+    // (Session 20). A job with just the primary (the normal case) divides
+    // by 1, i.e. no change from before this feature existed.
+    const headcount = 1 + wo.additionalTechnicians.length;
     let jobServiced = 0;
     let jobIncentive = 0;
     for (const r of results) {
+      const share = r.incentiveAmount / headcount;
       totalServiced += r.quantity;
-      totalIncentive += r.incentiveAmount;
+      totalIncentive += share;
       jobServiced += r.quantity;
-      jobIncentive += r.incentiveAmount;
+      jobIncentive += share;
       const existing = perService.get(r.key);
       if (existing) {
         existing.quantity += r.quantity;
-        existing.incentiveAmount += r.incentiveAmount;
+        existing.incentiveAmount += share;
       } else {
-        perService.set(r.key, { label: r.label, quantity: r.quantity, incentiveAmount: r.incentiveAmount });
+        perService.set(r.key, { label: r.label, quantity: r.quantity, incentiveAmount: share });
       }
     }
     jobRows.push({
@@ -95,6 +108,7 @@ export default async function TechnicianIncentivePage({ searchParams }: { search
       date: wo.invoice?.issueDate ?? wo.completedAt ?? wo.updatedAt,
       serviced: jobServiced,
       incentive: jobIncentive,
+      splitWith: headcount > 1 ? headcount : undefined,
     });
   }
 
@@ -152,6 +166,7 @@ export default async function TechnicianIncentivePage({ searchParams }: { search
                 <p className="font-medium text-ink-900">{j.woNumber}</p>
                 <p className="text-xs text-slate-400">
                   Invoice {j.invoiceNumber} · {new Date(j.date).toLocaleDateString()}
+                  {j.splitWith && ` · split ${j.splitWith} ways`}
                 </p>
               </div>
               <span className="font-medium text-ink-900">{formatMoney(j.incentive, currency)}</span>

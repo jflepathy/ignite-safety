@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import { logWorkOrderHistory } from '@/lib/work-order-history';
 import { z } from 'zod';
 
@@ -27,9 +27,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { session, error } = await requireRole('ADMIN', 'TECHNICIAN');
   if (error) return error;
 
-  const wo = await prisma.workOrder.findUnique({ where: { id: params.id } });
+  const wo = await prisma.workOrder.findUnique({ where: { id: params.id }, include: { additionalTechnicians: true } });
   if (!wo) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (session!.user.role === 'TECHNICIAN' && wo.assignedTechnicianId !== null && wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo)) {
+  if (
+    session!.user.role === 'TECHNICIAN' &&
+    !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)
+  ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

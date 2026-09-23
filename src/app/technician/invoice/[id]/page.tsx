@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import ShareInvoiceButtons from '@/components/technician/share-invoice-buttons';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -20,14 +20,14 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
   const session = await getServerSession(authOptions);
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { customer: true, lineItems: true, workOrder: true, payments: true },
+    include: { customer: true, lineItems: true, workOrder: { include: { additionalTechnicians: true } }, payments: true },
   });
   if (!invoice) notFound();
 
   const isAdminPreview = session!.user.role === 'ADMIN';
   if (!isAdminPreview) {
     const wo = invoice.workOrder;
-    if (!wo || (wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo))) notFound();
+    if (!wo || !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)) notFound();
   }
 
   const settings = await prisma.appSettings.findUnique({ where: { id: 1 } });

@@ -17,21 +17,23 @@ export default async function TechnicianHomePage() {
       where: {
         deletedAt: null,
         status: { in: ['PENDING', 'SCHEDULED', 'IN_PROGRESS'] },
-        // Open to any technician to pick up: never assigned, already theirs,
+        // Open to any technician to pick up: never assigned, already theirs
+        // (primary or one of the additional technicians on it — Session 20),
         // or assigned to someone else but idle 4+ days (stale — see
-        // work-order-status.ts). Once a job is freshly assigned, only that
-        // technician sees it (Session 11/12).
+        // work-order-status.ts). Once a job is freshly assigned, only those
+        // technicians see it (Session 11/12).
         ...(isAdminPreview
           ? {}
           : {
               OR: [
                 { assignedTechnicianId: null },
                 { assignedTechnicianId: session!.user.id },
+                { additionalTechnicians: { some: { technicianId: session!.user.id } } },
                 { assignedTechnicianId: { not: session!.user.id }, updatedAt: { lte: fourDaysAgo } },
               ],
             }),
       },
-      include: { customer: true, site: true },
+      include: { customer: true, site: true, additionalTechnicians: true },
       orderBy: { scheduledDate: 'asc' },
     }),
     isAdminPreview
@@ -80,7 +82,11 @@ export default async function TechnicianHomePage() {
 
 function JobCard({ wo, technicianId }: { wo: any; technicianId: string | null }) {
   const stale = isStaleAssignment(wo);
-  const isMine = wo.assignedTechnicianId === technicianId;
+  // "Mine" includes being an admin-added additional technician on this job
+  // (Session 20), not just the primary assignedTechnicianId.
+  const isMine =
+    wo.assignedTechnicianId === technicianId ||
+    (technicianId && (wo.additionalTechnicians ?? []).some((t: any) => t.technicianId === technicianId));
   const claimable = technicianId && !isMine && (!wo.assignedTechnicianId || stale);
 
   return (
@@ -97,6 +103,8 @@ function JobCard({ wo, technicianId }: { wo: any; technicianId: string | null })
         <p className="mt-1 text-sm text-slate-600">{wo.customer.displayName}</p>
         <p className="text-xs text-slate-400">
           {wo.serviceType === 'ONSITE' ? '📍 Onsite' : '🔧 Workshop'} · {wo.locationDetails || wo.region || 'No location set'}
+          {(wo.additionalTechnicians ?? []).length > 0 &&
+            ` · 👥 +${wo.additionalTechnicians.length} teammate${wo.additionalTechnicians.length === 1 ? '' : 's'}`}
         </p>
         {wo.scheduledDate && (
           <p className="mt-1 text-xs text-slate-400">{new Date(wo.scheduledDate).toLocaleDateString()}</p>

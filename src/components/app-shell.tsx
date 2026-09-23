@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import SignOutButton from '@/components/sign-out-button';
+import ChangePasswordButton from '@/components/change-password-button';
 import SidebarNav from '@/components/sidebar-nav';
 import CreateMenu from '@/components/create-menu';
 
@@ -84,6 +85,7 @@ export default function AppShell({
         </div>
         <div className="space-y-2 border-t border-white/10 pt-4">
           <p className="truncate px-2 text-xs text-slate-400">{email}</p>
+          <ChangePasswordButton variant="sidebar" />
           <SignOutButton />
         </div>
       </aside>

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import SignOutButton from '@/components/sign-out-button';
+import ChangePasswordButton from '@/components/change-password-button';
 
 export default async function TechnicianLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -32,6 +33,7 @@ export default async function TechnicianLayout({ children }: { children: React.R
               🖥 Back to Desktop
             </Link>
           )}
+          <ChangePasswordButton variant="header" />
           <SignOutButton />
         </div>
       </header>

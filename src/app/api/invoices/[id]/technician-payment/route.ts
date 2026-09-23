@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import { verifyPaymentPhoto } from '@/lib/payment-verification';
 import { z } from 'zod';
 
@@ -39,12 +39,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: { formErrors: ['A photo of the cheque / transfer confirmation is required.'] } }, { status: 400 });
   }
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: true, workOrder: true, customer: true } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id },
+    include: { payments: true, workOrder: { include: { additionalTechnicians: true } }, customer: true },
+  });
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   if (session!.user.role === 'TECHNICIAN') {
     const wo = invoice.workOrder;
-    if (!wo || (wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo))) {
+    if (!wo || !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }

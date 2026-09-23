@@ -16,9 +16,18 @@ export async function GET(req: NextRequest) {
     where: {
       deletedAt: null,
       ...(status ? { status: status as any } : {}),
-      ...(mine || session!.user.role === 'TECHNICIAN' ? { assignedTechnicianId: session!.user.id } : {}),
+      // "Mine" includes being an admin-added additional technician on the
+      // job, not just the primary assignedTechnicianId (Session 20).
+      ...(mine || session!.user.role === 'TECHNICIAN'
+        ? {
+            OR: [
+              { assignedTechnicianId: session!.user.id },
+              { additionalTechnicians: { some: { technicianId: session!.user.id } } },
+            ],
+          }
+        : {}),
     },
-    include: { customer: true, site: true, assignedTechnician: true, inspectionItems: true },
+    include: { customer: true, site: true, assignedTechnician: true, inspectionItems: true, additionalTechnicians: { include: { technician: true } } },
     orderBy: { scheduledDate: 'asc' },
     take: 300,
   });

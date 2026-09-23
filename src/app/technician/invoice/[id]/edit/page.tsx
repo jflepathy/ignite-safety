@@ -3,21 +3,21 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { canTechnicianAccess } from '@/lib/work-order-status';
 import TechnicianInvoiceLineEditor from '@/components/technician/invoice-line-editor';
 
 export default async function TechnicianEditInvoicePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { lineItems: { orderBy: { sortOrder: 'asc' } }, workOrder: true },
+    include: { lineItems: { orderBy: { sortOrder: 'asc' } }, workOrder: { include: { additionalTechnicians: true } } },
   });
   if (!invoice) notFound();
 
   const isAdminPreview = session!.user.role === 'ADMIN';
   if (!isAdminPreview) {
     const wo = invoice.workOrder;
-    if (!wo || (wo.assignedTechnicianId !== session!.user.id && !isStaleAssignment(wo))) notFound();
+    if (!wo || !canTechnicianAccess(wo, wo.additionalTechnicians.map((t) => t.technicianId), session!.user.id)) notFound();
   }
 
   const settings = await prisma.appSettings.findUnique({ where: { id: 1 } });

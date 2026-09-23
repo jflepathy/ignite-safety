@@ -3,23 +3,25 @@ import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import PosClient from '@/components/technician/pos-client';
-import { isStaleAssignment } from '@/lib/work-order-status';
+import { isStaleAssignment, canTechnicianAccess } from '@/lib/work-order-status';
 
 export default async function TechnicianJobPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const [wo, settings] = await Promise.all([
     prisma.workOrder.findUnique({
       where: { id: params.id },
-      include: { customer: true, site: true },
+      include: { customer: true, site: true, additionalTechnicians: true },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
   if (!wo) notFound();
   const stale = isStaleAssignment(wo);
-  // A job is open to any technician when it's unassigned, already theirs,
-  // or has gone stale (assigned to someone else but idle 4+ days — see
+  const additionalTechnicianIds = wo.additionalTechnicians.map((t) => t.technicianId);
+  // A job is open to any technician when it's unassigned, already theirs
+  // (primary or one of the additional technicians on it — Session 20), or
+  // has gone stale (assigned to someone else but idle 4+ days — see
   // work-order-status.ts). Admin preview always gets in (Session 11/12).
-  if (session!.user.role === 'TECHNICIAN' && wo.assignedTechnicianId !== null && wo.assignedTechnicianId !== session!.user.id && !stale) {
+  if (session!.user.role === 'TECHNICIAN' && !canTechnicianAccess(wo, additionalTechnicianIds, session!.user.id)) {
     notFound();
   }
 

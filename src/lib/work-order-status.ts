@@ -39,12 +39,42 @@ export function isStaleAssignment(wo: { assignedTechnicianId: string | null; sta
 
 /** True when this job is open for the given technician to claim — either
  * never assigned, already theirs, or stale (assigned to someone else but
- * idle for 4+ days). */
+ * idle for 4+ days). Claiming always acts on the primary
+ * assignedTechnicianId — additional technicians (below) are admin-added,
+ * not self-claimed. */
 export function isClaimableBy(
   wo: { assignedTechnicianId: string | null; status: string; updatedAt: Date },
   technicianId: string
 ): boolean {
   if (wo.assignedTechnicianId === technicianId) return true;
   if (wo.assignedTechnicianId === null) return true;
+  return isStaleAssignment(wo);
+}
+
+/** True when a job has this technician on it at all — either as the
+ * primary assignedTechnicianId or as one of the admin-added additional
+ * technicians (Session 20, multi-technician jobs with a split incentive).
+ * `additionalTechnicianIds` is the job's WorkOrderTechnician rows' ids,
+ * fetched by the caller. */
+export function isOnJob(
+  wo: { assignedTechnicianId: string | null },
+  additionalTechnicianIds: string[],
+  technicianId: string
+): boolean {
+  return wo.assignedTechnicianId === technicianId || additionalTechnicianIds.includes(technicianId);
+}
+
+/** True when this technician may view/act on this job — on it (primary or
+ * additional), unassigned, or stale. This is the general access check used
+ * everywhere a technician-facing route or page scopes a Work Order/Invoice
+ * to "my job"; it supersedes a bare `assignedTechnicianId === me` check now
+ * that a job can have more than one technician on it. */
+export function canTechnicianAccess(
+  wo: { assignedTechnicianId: string | null; status: string; updatedAt: Date },
+  additionalTechnicianIds: string[],
+  technicianId: string
+): boolean {
+  if (wo.assignedTechnicianId === null) return true;
+  if (isOnJob(wo, additionalTechnicianIds, technicianId)) return true;
   return isStaleAssignment(wo);
 }

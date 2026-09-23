@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
 import CustomerCombobox from '@/components/shared/customer-combobox';
 import ItemCombobox from '@/components/shared/item-combobox';
+import { useBarcodeScanner } from '@/lib/use-barcode-scanner';
 
 type Customer = { id: string; displayName: string; terms?: string | null };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
@@ -189,6 +190,53 @@ export default function InvoiceForm({
     if (idx === lines.length - 1) addLine();
   }
 
+  // Barcode scanner support (Session 20) -- registers a scanned item no
+  // matter which field currently has focus (the Item combobox doesn't need
+  // to be open first). A scan of an item already on the invoice bumps its
+  // quantity by one instead of adding a duplicate line; a fresh item fills
+  // the first empty line, or is appended if there isn't one.
+  const [scanFeedback, setScanFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  const scanFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleScan(code: string) {
+    const item = shopItems.find((s) => s.sku.toLowerCase() === code.trim().toLowerCase());
+    if (!item) {
+      showScanFeedback(false, `No item found for scanned code "${code}"`);
+      return;
+    }
+    setLines((prev) => {
+      const existingIdx = prev.findIndex((l) => l.shopItemId === item.id);
+      if (existingIdx !== -1) {
+        return prev.map((l, i) => (i === existingIdx ? { ...l, quantity: l.quantity + 1 } : l));
+      }
+      const filled: Line = {
+        key: Math.random().toString(36).slice(2),
+        shopItemId: item.id,
+        description: item.name,
+        quantity: 1,
+        unitPrice: parseFloat(item.unitPrice),
+        discountPercent: 0,
+        taxRateId: item.taxable ? defaultTaxRate?.id ?? null : null,
+      };
+      const blankIdx = prev.findIndex(isBlankLine);
+      if (blankIdx !== -1) {
+        const next = [...prev];
+        next[blankIdx] = filled;
+        return next;
+      }
+      return [...prev, filled];
+    });
+    showScanFeedback(true, `Added ${item.sku} — ${item.name}`);
+  }
+
+  function showScanFeedback(ok: boolean, message: string) {
+    setScanFeedback({ ok, message });
+    if (scanFeedbackTimer.current) clearTimeout(scanFeedbackTimer.current);
+    scanFeedbackTimer.current = setTimeout(() => setScanFeedback(null), 2500);
+  }
+
+  useBarcodeScanner(handleScan);
+
   const totals = useMemo(() => {
     return computeDocumentTotals(
       lines.map((l) => ({
@@ -353,11 +401,19 @@ export default function InvoiceForm({
 
       <div className="card p-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
+            <span className="text-xs text-slate-400">Scan a barcode anytime to add an item</span>
+          </div>
           <button className="btn-secondary" onClick={addLine} type="button">
             + Add line
           </button>
         </div>
+        {scanFeedback && (
+          <p className={`mb-2 text-xs font-medium ${scanFeedback.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+            {scanFeedback.ok ? '✓' : '✗'} {scanFeedback.message}
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

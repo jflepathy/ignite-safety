@@ -212,6 +212,7 @@ model User {
   // Relations
   createdServiceRequests ServiceRequest[] @relation("ServiceRequestCreatedBy")
   assignedWorkOrders     WorkOrder[]      @relation("WorkOrderTechnician")
+  additionalWorkOrders   WorkOrderTechnician[] @relation("WorkOrderAdditionalTechnician")
   createdInvoices        Invoice[]        @relation("InvoiceCreatedBy")
   createdEstimates       Estimate[]       @relation("EstimateCreatedBy")
   recordedPayments       Payment[]        @relation("PaymentRecordedBy")
@@ -1082,10 +1083,33 @@ model WorkOrder {
 
   inspectionItems WorkOrderInspectionItem[]
   historyEntries  WorkOrderHistoryEntry[]
+  // Extra technicians beyond the primary assignedTechnicianId (Session 20)
+  // -- lets an admin put more than one tech on a job; the incentive the job
+  // earns is split equally across everyone on it (primary + additional).
+  // Kept as a side table rather than replacing assignedTechnicianId so
+  // every existing single-technician ownership/claim check keeps working
+  // unchanged -- the primary technician is still the "owner" for claiming
+  // a stale/unassigned job; additional technicians are purely admin-added.
+  additionalTechnicians WorkOrderTechnician[]
 
   @@index([status])
   @@index([scheduledDate])
   @@map("work_orders")
+}
+
+// Join table for extra technicians on a Work Order beyond the primary
+// assignedTechnicianId (Session 20). See the comment on WorkOrder's
+// additionalTechnicians field.
+model WorkOrderTechnician {
+  id           String    @id @default(cuid())
+  workOrderId  String
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  technicianId String
+  technician   User      @relation("WorkOrderAdditionalTechnician", fields: [technicianId], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@unique([workOrderId, technicianId])
+  @@map("work_order_technicians")
 }
 
 // Admin-only audit trail of claims, assignments and status changes on a

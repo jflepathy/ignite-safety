@@ -19,6 +19,7 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
         inspectionItems: true,
         invoice: true,
         serviceRequest: true,
+        additionalTechnicians: { include: { technician: true } },
         ...(isAdmin ? { historyEntries: { orderBy: { createdAt: 'desc' as const } } } : {}),
       },
     }),
@@ -71,6 +72,12 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
           <p className="text-sm text-slate-600">
             <span className="font-medium">Location:</span> {wo.locationDetails ?? '—'}
           </p>
+          {wo.additionalTechnicians.length > 0 && (
+            <p className="text-sm text-slate-600">
+              <span className="font-medium">Also on this job:</span>{' '}
+              {wo.additionalTechnicians.map((t) => t.technician.name).join(', ')}
+            </p>
+          )}
           {wo.serviceRequest && (
             <p className="text-sm text-slate-600">
               <span className="font-medium">Source Request:</span> {wo.serviceRequest.requestNumber}
@@ -79,7 +86,12 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
         </div>
         <div className="card space-y-3 p-6">
           <h2 className="text-sm font-semibold text-ink-900">Assignment</h2>
-          <AssignTechnicianForm workOrderId={wo.id} technicians={technicians} currentTechnicianId={wo.assignedTechnicianId} />
+          <AssignTechnicianForm
+            workOrderId={wo.id}
+            technicians={technicians}
+            currentTechnicianId={wo.assignedTechnicianId}
+            currentAdditionalTechnicianIds={wo.additionalTechnicians.map((t) => t.technicianId)}
+          />
         </div>
       </div>
 
