@@ -23,6 +23,17 @@ export default function JournalEntryForm({ accounts }: { accounts: AccountOption
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
+  // Reorder lines (Session 21).
+  function moveLine(key: string, direction: -1 | 1) {
+    setLines((prev) => {
+      const idx = prev.findIndex((l) => l.key === key);
+      const swapIdx = idx + direction;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
 
   const totals = useMemo(() => {
     const debit = Math.round(lines.reduce((s, l) => s + l.debit, 0) * 100) / 100;
@@ -83,11 +94,12 @@ export default function JournalEntryForm({ accounts }: { accounts: AccountOption
               <th className="py-2 pr-2">Description</th>
               <th className="w-28 py-2 text-right">Debit</th>
               <th className="w-28 py-2 text-right">Credit</th>
+              <th className="w-14 py-2" />
               <th className="w-8 py-2" />
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
+            {lines.map((line, idx) => (
               <tr key={line.key} className="border-t border-slate-100">
                 <td className="py-2 pr-2">
                   <select className="input" value={line.accountId} onChange={(e) => updateLine(line.key, { accountId: e.target.value })}>
@@ -119,6 +131,28 @@ export default function JournalEntryForm({ accounts }: { accounts: AccountOption
                     value={line.credit}
                     onChange={(e) => updateLine(line.key, { credit: parseFloat(e.target.value) || 0, debit: 0 })}
                   />
+                </td>
+                <td className="py-2">
+                  <div className="flex items-center justify-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, -1)}
+                      disabled={idx === 0}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line up"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, 1)}
+                      disabled={idx === lines.length - 1}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line down"
+                    >
+                      ▼
+                    </button>
+                  </div>
                 </td>
                 <td className="py-2 text-right">
                   {lines.length > 2 && (

@@ -29,12 +29,14 @@
   }
   /* Session 19: denser form fields (smaller text, tighter vertical padding)
      so a form with a lot of fields (Invoice, Estimate, Customer edit, ...)
-     fits more on screen without scrolling as much. */
+     fits more on screen without scrolling as much. Session 21: shrunk by
+     another 2pt per the user's explicit follow-up ("lower font size by 2
+     points again"). */
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-lg border border-slate-300 px-2 py-1 text-[11px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
   }
   .label {
-    @apply mb-0.5 block text-[11px] font-medium text-slate-600;
+    @apply mb-0.5 block text-[9px] font-medium text-slate-600;
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;

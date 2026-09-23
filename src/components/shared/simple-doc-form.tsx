@@ -103,6 +103,17 @@ export default function SimpleDocForm({
   function addLine() {
     setLines((p) => [...p, emptyLine()]);
   }
+  // Reorder line items (Session 21).
+  function moveLine(key: string, direction: -1 | 1) {
+    setLines((prev) => {
+      const idx = prev.findIndex((l) => l.key === key);
+      const swapIdx = idx + direction;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
   // Selecting an item on the last line opens a fresh blank line beneath it.
   function selectShopItem(idx: number, key: string, shopItemId: string) {
     applyShopItem(key, shopItemId);
@@ -226,6 +237,7 @@ export default function SimpleDocForm({
               <th className="w-28 py-2 text-right">Unit Price</th>
               {taxRates.length > 0 && <th className="w-32 py-2">Tax</th>}
               <th className="w-28 py-2 text-right">Total</th>
+              <th className="w-14 py-2" />
               <th className="w-8 py-2" />
             </tr>
           </thead>
@@ -273,6 +285,28 @@ export default function SimpleDocForm({
                   </td>
                 )}
                 <td className="py-2 text-right font-medium">{line.lineTotal.toFixed(2)}</td>
+                <td className="py-2">
+                  <div className="flex items-center justify-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, -1)}
+                      disabled={idx === 0}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line up"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, 1)}
+                      disabled={idx === totals.computed.length - 1}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line down"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </td>
                 <td className="py-2 text-right">
                   {lines.length > 1 && (
                     <button type="button" onClick={() => setLines((p) => p.filter((l) => l.key !== line.key))} className="text-slate-400 hover:text-red-600">

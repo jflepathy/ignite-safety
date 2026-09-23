@@ -44,6 +44,18 @@ export default function TechnicianInvoiceLineEditor({
     setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   }
 
+  // Reorder lines (Session 21).
+  function moveLine(key: string, direction: -1 | 1) {
+    setLines((prev) => {
+      const idx = prev.findIndex((l) => l.key === key);
+      const swapIdx = idx + direction;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
+
   function selectShopItem(key: string, item: ShopItemOption) {
     setLines((ls) => {
       const idx = ls.findIndex((l) => l.key === key);
@@ -91,7 +103,7 @@ export default function TechnicianInvoiceLineEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        {lines.map((line) => (
+        {lines.map((line, idx) => (
           <div key={line.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <ItemCombobox
               items={shopItems}
@@ -135,11 +147,33 @@ export default function TechnicianInvoiceLineEditor({
               <span className="text-sm font-medium text-ink-900">
                 {formatMoney(line.quantity * line.unitPrice, currency)}
               </span>
-              {lines.length > 1 && (
-                <button type="button" className="text-xs text-red-600" onClick={() => removeLine(line.key)}>
-                  Remove
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => moveLine(line.key, -1)}
+                    disabled={idx === 0}
+                    className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                    aria-label="Move line up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveLine(line.key, 1)}
+                    disabled={idx === lines.length - 1}
+                    className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                    aria-label="Move line down"
+                  >
+                    ▼
+                  </button>
+                </div>
+                {lines.length > 1 && (
+                  <button type="button" className="text-xs text-red-600" onClick={() => removeLine(line.key)}>
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}

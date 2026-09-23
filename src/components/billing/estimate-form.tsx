@@ -86,6 +86,17 @@ export default function EstimateForm({
   function addLine() {
     setLines((p) => [...p, emptyLine()]);
   }
+  // Reorder line items (Session 21).
+  function moveLine(key: string, direction: -1 | 1) {
+    setLines((prev) => {
+      const idx = prev.findIndex((l) => l.key === key);
+      const swapIdx = idx + direction;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
   // Selecting an item on the last line opens a fresh blank line beneath it.
   function selectShopItem(idx: number, key: string, shopItemId: string) {
     applyShopItem(key, shopItemId);
@@ -171,6 +182,7 @@ export default function EstimateForm({
               <th className="w-28 py-2 text-right">Unit Price</th>
               <th className="w-32 py-2">Tax</th>
               <th className="w-28 py-2 text-right">Total</th>
+              <th className="w-14 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -223,6 +235,28 @@ export default function EstimateForm({
                   </select>
                 </td>
                 <td className="py-2 text-right font-medium">{totals.lines[idx]?.lineTotal.toFixed(2)}</td>
+                <td className="py-2">
+                  <div className="flex items-center justify-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, -1)}
+                      disabled={idx === 0}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line up"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLine(line.key, 1)}
+                      disabled={idx === lines.length - 1}
+                      className="text-slate-400 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-25"
+                      aria-label="Move line down"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
