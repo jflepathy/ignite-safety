@@ -39,6 +39,9 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           <Link href="/billing?tab=estimates" className="btn-secondary">
             ← Back
           </Link>
+          <Link href={`/billing/estimates/${estimate.id}/edit`} className="btn-secondary">
+            Edit
+          </Link>
           <PrintButton />
           <DownloadPdfButton targetId="pdf-document" fileName={estimate.estimateNumber} />
         </div>

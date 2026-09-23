@@ -32,24 +32,38 @@ function emptyLine(): Line {
   };
 }
 
+export type EstimateFormInitial = {
+  customerId: string;
+  expiryDate: string;
+  notes: string;
+  lines: Line[];
+};
+
 export default function EstimateForm({
   customers,
   shopItems,
   taxRates,
   currency,
+  mode = 'create',
+  estimateId,
+  initial,
 }: {
   customers: Customer[];
   shopItems: ShopItem[];
   taxRates: TaxRate[];
   currency: string;
+  /** 'edit' loads from `initial` and PATCHes `estimateId` instead of POSTing a new estimate. */
+  mode?: 'create' | 'edit';
+  estimateId?: string;
+  initial?: EstimateFormInitial;
 }) {
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
   const [customerOptions, setCustomerOptions] = useState(customers);
-  const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [notes, setNotes] = useState('');
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? customers[0]?.id ?? '');
+  const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
   const [printAfterSave, setPrintAfterSave] = useState(true);
   const [submitting, setSubmitting] = useState<'save' | 'print' | null>(null);
   const [error, setError] = useState('');
@@ -118,27 +132,29 @@ export default function EstimateForm({
       if (filledLines.length === 0) {
         throw new Error('Add at least one line item before saving.');
       }
-      const res = await fetch('/api/estimates', {
-        method: 'POST',
+      const lineItems = filledLines.map((l) => ({
+        shopItemId: l.shopItemId,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        discountPercent: l.discountPercent,
+        taxRateId: l.taxRateId,
+        taxRatePercent: l.taxRateId
+          ? parseFloat(taxRates.find((t) => t.id === l.taxRateId)?.ratePercent ?? '0')
+          : 0,
+      }));
+      const isEdit = mode === 'edit';
+      const res = await fetch(isEdit ? `/api/estimates/${estimateId}` : '/api/estimates', {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId,
-          expiryDate: expiryDate || undefined,
+          expiryDate: expiryDate || (isEdit ? null : undefined),
           notes,
-          lineItems: filledLines.map((l) => ({
-            shopItemId: l.shopItemId,
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            discountPercent: l.discountPercent,
-            taxRateId: l.taxRateId,
-            taxRatePercent: l.taxRateId
-              ? parseFloat(taxRates.find((t) => t.id === l.taxRateId)?.ratePercent ?? '0')
-              : 0,
-          })),
+          lineItems,
         }),
       });
-      if (!res.ok) throw new Error('Failed to create estimate');
+      if (!res.ok) throw new Error(`Failed to ${isEdit ? 'save' : 'create'} estimate`);
       const estimate = await res.json();
       const shouldPrint = action === 'print' || printAfterSave;
       router.push(`/billing/estimates/${estimate.id}${shouldPrint ? '?print=1' : ''}`);
@@ -296,12 +312,20 @@ export default function EstimateForm({
           Print after saving
         </label>
         <div className="flex gap-2">
-          <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
-            {submitting === 'save' ? 'Saving…' : 'Save'}
-          </button>
-          <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
-            {submitting === 'print' ? 'Saving…' : 'Save & Print'}
-          </button>
+          {mode === 'edit' ? (
+            <button className="btn-primary" disabled={!!submitting} onClick={() => submit('save')}>
+              {submitting === 'save' ? 'Saving…' : 'Save Changes'}
+            </button>
+          ) : (
+            <>
+              <button className="btn-secondary" disabled={!!submitting} onClick={() => submit('save')}>
+                {submitting === 'save' ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-primary" disabled={!!submitting} onClick={() => submit('print')}>
+                {submitting === 'print' ? 'Saving…' : 'Save & Print'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
