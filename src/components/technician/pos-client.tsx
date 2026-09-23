@@ -48,6 +48,10 @@ const WORKSHOP_ACTIONS: { key: string; label: string }[] = [
   { key: 'rust', label: 'Rust Treatment' },
   { key: 'pressurize', label: 'Pressurize' },
   { key: 'valvechange', label: 'Valve Change' },
+  // Not a service performed on the spot -- flags that an extinguisher is
+  // being taken off-site to the workshop instead of serviced here, so the
+  // office can see it on the job and follow up (Session 18).
+  { key: 'fext_workshop', label: 'Send F/Ext to Workshop' },
 ];
 
 export default function PosClient({
