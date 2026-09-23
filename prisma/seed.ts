@@ -53,7 +53,7 @@ async function main() {
       currencyCode: 'SCR',
       logoUrl: DEFAULT_LOGO_WHITE_BG,
       faviconUrl: DEFAULT_LOGO_TRANSPARENT,
-      invoiceTermsDefault: 'Payment due within 30 days of invoice date. Late payments subject to 2% monthly interest.',
+      invoiceTermsDefault: 'Due on Receipt',
       dailyTeamCapacity: 3,
       overdueThresholdDays: 30,
       defaultServiceIntervalMonths: 12,

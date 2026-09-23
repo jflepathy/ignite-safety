@@ -15,11 +15,17 @@ type Customer = {
   region: string | null;
   district: string | null;
   taxId: string | null;
+  terms: string | null;
   notes: string | null;
   _count: { equipment: number; invoices: number; workOrders: number };
 };
 
 export const REGION_OPTIONS = ['Mahe', 'Praslin', 'La Digue', 'Outer Islands'];
+
+// Matches InvoiceForm's TERMS_PRESETS (minus "Custom", which doesn't make
+// sense as a stored per-customer default) -- keeps a customer's saved
+// Terms directly selectable as an Invoice preset with no extra matching.
+export const CUSTOMER_TERMS_OPTIONS = ['Due on Receipt', 'Net 15', 'Net 30', 'Net 60'];
 
 // The official 26 administrative districts of Seychelles, grouped by region
 // (per Wikipedia's "Districts of Seychelles" — the 14 Mahe-island districts
@@ -105,6 +111,7 @@ export default function CustomersTable({ customers, canEdit }: { customers: Cust
                         region: c.region ?? '',
                         district: c.district ?? '',
                         taxId: c.taxId ?? '',
+                        terms: c.terms ?? '',
                         notes: c.notes ?? '',
                       }}
                       fields={[
@@ -137,6 +144,15 @@ export default function CustomersTable({ customers, canEdit }: { customers: Cust
                           options: [{ value: '', label: '— Select —' }, ...districtOptions.map((d) => ({ value: d, label: d }))],
                         },
                         { key: 'taxId', label: 'Tax / VAT ID' },
+                        {
+                          key: 'terms',
+                          label: 'Default Invoice Terms',
+                          type: 'select',
+                          options: [
+                            { value: '', label: '— Use company default —' },
+                            ...CUSTOMER_TERMS_OPTIONS.map((t) => ({ value: t, label: t })),
+                          ],
+                        },
                         { key: 'notes', label: 'Notes', type: 'textarea' },
                       ]}
                     />

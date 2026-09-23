@@ -38,10 +38,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: { formErrors: ['This job has no recorded services to bill yet.'] } }, { status: 400 });
   }
 
-  const [shopItems, incentiveRates] = await Promise.all([
+  const [shopItems, incentiveRates, customer, settings] = await Promise.all([
     prisma.shopItem.findMany(),
     prisma.incentiveRate.findMany(),
+    prisma.customer.findUnique({ where: { id: wo.customerId } }),
+    prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
+
+  // Same Terms defaulting as the desktop New Invoice form (Session 18):
+  // the customer's own saved Terms, then the company-wide default, then
+  // "Due on Receipt" -- and a matching due date, so a technician-raised
+  // invoice isn't left with a blank due date the office has to fix later.
+  const NET_TERMS_DAYS: Record<string, number> = { 'Net 15': 15, 'Net 30': 30, 'Net 60': 60 };
+  const terms = (customer?.terms && customer.terms.trim()) || settings?.invoiceTermsDefault || 'Due on Receipt';
+  const issueDate = new Date();
+  const dueDate = terms in NET_TERMS_DAYS
+    ? new Date(issueDate.getTime() + NET_TERMS_DAYS[terms] * 24 * 60 * 60 * 1000)
+    : issueDate;
   const shopItemsById = new Map(shopItems.map((s) => [s.id, { id: s.id, sku: s.sku, name: s.name, unitPrice: Number(s.unitPrice), taxable: s.taxable }]));
   const ratesByKey = new Map(
     incentiveRates.map((r) => [
@@ -77,7 +90,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       invoiceNumber,
       customerId: wo.customerId,
       status: 'DRAFT',
-      issueDate: new Date(),
+      issueDate,
+      dueDate,
+      terms,
       subtotal: totals.subtotal,
       discountTotal: totals.discountTotal,
       taxTotal: totals.taxTotal,

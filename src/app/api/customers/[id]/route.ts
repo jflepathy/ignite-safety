@@ -22,6 +22,7 @@ const UpdateSchema = z.object({
   region: z.string().optional().nullable(),
   district: z.string().optional().nullable(),
   taxId: z.string().optional().nullable(),
+  terms: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 

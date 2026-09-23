@@ -6,7 +6,7 @@ import { computeDocumentTotals } from '@/lib/money';
 import CustomerCombobox from '@/components/shared/customer-combobox';
 import ItemCombobox from '@/components/shared/item-combobox';
 
-type Customer = { id: string; displayName: string };
+type Customer = { id: string; displayName: string; terms?: string | null };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
 type TaxRate = { id: string; name: string; ratePercent: string; isDefault: boolean };
 
@@ -141,15 +141,22 @@ export default function InvoiceForm({
     }
   }
 
-  // On a brand-new invoice, if a default term (e.g. Net 30 from the
-  // customer's saved terms) came in, apply the same auto-calc once so the
-  // due date isn't left blank until the user touches the dropdown.
+  // Terms default from the selected customer's own saved Terms when they
+  // have one (Customer > Edit > "Default Invoice Terms"), falling back to
+  // the company-wide default (Admin > Company Profile) and then "Due on
+  // Receipt" otherwise. Re-applies whenever the customer changes on a
+  // brand-new invoice -- switching customer resets Terms/due date to that
+  // customer's usual arrangement, same as QuickBooks does, rather than
+  // silently leaving the previous customer's terms in place. Never touches
+  // an invoice that's already being edited.
   useEffect(() => {
-    if (mode === 'create' && !initial?.dueDate && termsPreset in NET_TERMS_DAYS) {
-      selectTermsPreset(termsPreset);
-    }
+    if (mode !== 'create') return;
+    const c = customerOptions.find((opt) => opt.id === customerId);
+    const preferred = (c?.terms && c.terms.trim()) || defaultTerms || 'Due on Receipt';
+    selectTermsPreset(TERMS_PRESETS.includes(preferred) ? preferred : 'Custom');
+    if (!TERMS_PRESETS.includes(preferred)) setTerms(preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [customerId]);
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));

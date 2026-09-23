@@ -39,6 +39,7 @@ const CreateCustomerSchema = z.object({
   region: z.string().optional(),
   district: z.string().optional(),
   taxId: z.string().optional(),
+  terms: z.string().optional(),
   notes: z.string().optional(),
 });
 

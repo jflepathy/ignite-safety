@@ -281,6 +281,7 @@ model Customer {
   region        String? // broad area, e.g. Mahe, Praslin, La Digue
   district      String? // specific district within the region, e.g. Anse Etoile
   taxId         String? // local VAT / business registration number
+  terms         String? // this customer's own default invoice Terms (e.g. "Net 30"), overriding the company-wide default when set (Session 18)
   notes         String?
   active        Boolean      @default(true)
   deletedAt     DateTime? // soft delete -> Recycle Bin
@@ -1353,7 +1354,7 @@ model AppSettings {
   currencyCode          String  @default("SCR")
   logoUrl               String? // logo used on printed documents/forms (white background)
   faviconUrl            String? // browser-tab icon (transparent background)
-  invoiceTermsDefault   String? @default("Payment due within 30 days.")
+  invoiceTermsDefault   String? @default("Due on Receipt")
   paymentInstructions   String? @default("1. Cash\n2. Credit / Debit Card\n3. Cheque\n4. Bank Transfer\n5. Approved PO") // printed on invoice/estimate/receipt footer
   bankName              String?
   bankAccountName       String?

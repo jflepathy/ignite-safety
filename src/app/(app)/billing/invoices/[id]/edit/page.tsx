@@ -50,7 +50,7 @@ export default async function EditInvoicePage({ params }: { params: { id: string
         <p className="text-sm text-slate-500">Changes are saved to this invoice in place — its number stays the same.</p>
       </div>
       <InvoiceForm
-        customers={customers.map((c) => ({ id: c.id, displayName: c.displayName }))}
+        customers={customers.map((c) => ({ id: c.id, displayName: c.displayName, terms: c.terms }))}
         shopItems={shopItems.map((s) => ({
           id: s.id,
           sku: s.sku,

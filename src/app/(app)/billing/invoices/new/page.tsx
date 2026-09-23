@@ -63,7 +63,7 @@ export default async function NewInvoicePage({
         )}
       </div>
       <InvoiceForm
-        customers={customers.map((c) => ({ id: c.id, displayName: c.displayName }))}
+        customers={customers.map((c) => ({ id: c.id, displayName: c.displayName, terms: c.terms }))}
         shopItems={shopItems.map((s) => ({
           id: s.id,
           sku: s.sku,

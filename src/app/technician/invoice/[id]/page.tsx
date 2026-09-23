@@ -75,6 +75,7 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
       </div>
 
       <ShareInvoiceButtons
+        invoiceId={invoice.id}
         sharePath={sharePath}
         customerName={invoice.customer.displayName}
         customerPhone={invoice.customer.phone}
