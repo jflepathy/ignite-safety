@@ -56,6 +56,9 @@ export default function InvoiceDocument({
   balanceDue,
   taxInclusive,
   customerMessage,
+  totalLabel = 'Balance Due',
+  showTaxNote = true,
+  headerGradient = false,
 }: {
   settings: Settings;
   documentLabel?: string;
@@ -76,6 +79,18 @@ export default function InvoiceDocument({
   balanceDue: string;
   taxInclusive?: boolean;
   customerMessage?: string | null;
+  /** Label shown above the bold total figure — e.g. "Total" reads better
+   * than "Balance Due" on a document (like an Estimate) that isn't an
+   * amount owed yet. Defaults to "Balance Due" for Invoice/Sales Receipt. */
+  totalLabel?: string;
+  /** The small "Prices shown include/exclude tax" note under the totals
+   * block. Off by default is not the default — this defaults to shown,
+   * matching existing Invoice/Sales Receipt behavior; pass false to hide
+   * it (e.g. on the Estimate, per request). */
+  showTaxNote?: boolean;
+  /** Company header band background: a soft blue-to-white wash instead of
+   * the plain slate tint. Used by the Estimate print layout. */
+  headerGradient?: boolean;
 }) {
   const hasDiscount = Number(globalDiscountPercent) > 0 || lineItems.some((li) => Number(li.discountPercent) > 0);
   const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
@@ -86,7 +101,13 @@ export default function InvoiceDocument({
       style={{ fontFamily: '"Courier New", Courier, monospace' }}
     >
       {/* Company header band */}
-      <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-slate-50/60 p-8 print:bg-white">
+      <div
+        className={
+          headerGradient
+            ? 'flex items-start justify-between gap-6 border-b border-slate-100 bg-gradient-to-b from-sky-100 via-sky-50 to-white p-8 print:bg-white'
+            : 'flex items-start justify-between gap-6 border-b border-slate-100 bg-slate-50/60 p-8 print:bg-white'
+        }
+      >
         <div>
           <p className="text-lg font-bold tracking-tight">{settings.companyName}</p>
           <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-500">{settings.companyAddress}</p>
@@ -234,13 +255,13 @@ export default function InvoiceDocument({
               </div>
             )}
             <div className="flex items-center justify-between rounded-lg bg-ink-900 px-4 py-3 text-white print:rounded-none print:bg-transparent print:px-0 print:text-ink-900">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-300 print:text-slate-500">Balance Due</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-300 print:text-slate-500">{totalLabel}</span>
               <span className="text-xl font-bold">{formatMoney(balanceDue, currency)}</span>
             </div>
           </div>
         </div>
 
-        {taxTotal !== undefined && (
+        {showTaxNote && taxTotal !== undefined && (
           <p className="mt-2 text-right text-xs text-slate-400 print:hidden">
             Prices shown {taxInclusive ? 'include' : 'exclude'} tax.
           </p>

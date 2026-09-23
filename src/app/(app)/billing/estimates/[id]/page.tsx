@@ -85,6 +85,9 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           balanceDue={estimate.total.toString()}
           taxInclusive={estimate.taxInclusive}
           customerMessage={estimate.customerMessage}
+          totalLabel="Total"
+          showTaxNote={false}
+          headerGradient
         />
       </div>
     </div>
