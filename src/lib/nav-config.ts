@@ -63,6 +63,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Employees', href: '/team/employees' },
       { label: 'Time Tracking', href: '/team/time-tracking' },
+      { label: 'Incentive Rates', href: '/team/incentive-rates' },
     ],
   },
   {

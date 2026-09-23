@@ -68,6 +68,7 @@ export default function InvoiceForm({
   mode = 'create',
   invoiceId,
   initial,
+  initialLines,
 }: {
   customers: Customer[];
   shopItems: ShopItem[];
@@ -80,6 +81,10 @@ export default function InvoiceForm({
   mode?: 'create' | 'edit';
   invoiceId?: string;
   initial?: InvoiceFormInitial;
+  /** Create-mode only: lines auto-populated from a Work Order's serviceLines
+   * (Session 16) — a starting point the user reviews/edits before saving,
+   * not sent through `initial` since that's an 'edit'-mode-shaped prop. */
+  initialLines?: { shopItemId: string | null; description: string; quantity: number; unitPrice: number }[];
 }) {
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
@@ -99,7 +104,21 @@ export default function InvoiceForm({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState('MONTHLY');
   const [status, setStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
-  const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
+  const [lines, setLines] = useState<Line[]>(
+    initial?.lines?.length
+      ? initial.lines
+      : initialLines?.length
+      ? initialLines.map((l) => ({
+          key: Math.random().toString(36).slice(2),
+          shopItemId: l.shopItemId,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          discountPercent: 0,
+          taxRateId: defaultTaxRate?.id ?? null,
+        }))
+      : [emptyLine()]
+  );
   const [printAfterSave, setPrintAfterSave] = useState(true);
   const [submitting, setSubmitting] = useState<'DRAFT' | 'SENT' | 'EDIT' | null>(null);
   const [errorMsg, setErrorMsg] = useState('');

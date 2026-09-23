@@ -106,6 +106,9 @@ export async function PATCH(req: NextRequest) {
     'defaultServiceIntervalMonths',
     'reminderLeadDays',
     'requireCustomerSignoff',
+    // Technician Incentive Program
+    'defaultIncentiveFraction',
+    'technicianCollectionsBankAccountId',
     // Tax & Financial
     'defaultTaxRateId',
     'taxInclusivePricing',

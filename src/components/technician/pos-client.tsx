@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignaturePad from './signature-pad';
+import BillingBridgeModal from './billing-bridge-modal';
 
 type ServiceLine = { key: string; label: string; quantity: number; kind: 'STANDARD' | 'CUSTOM' | 'WORKSHOP' };
 
@@ -20,6 +21,7 @@ type WorkOrder = {
   technicianNotes: string | null;
   serviceLines: ServiceLine[];
   invoiceNumberIfIssued: string | null;
+  invoiceId: string | null;
   customerSignedName: string | null;
   customerSignatureDataUrl: string | null;
 };
@@ -88,6 +90,10 @@ export default function PosClient({
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Shown right after a successful Complete & Sync (Session 16) — only for
+  // a technician (not admin preview) and only when this job isn't already
+  // billed, so re-opening a completed job doesn't re-prompt every time.
+  const [showBillingBridge, setShowBillingBridge] = useState(false);
   // Claiming is now a deliberate, explicit step (Session 12) rather than
   // something that happened silently on the first autosave — a job that's
   // unassigned or gone stale is claimed with its own button before the
@@ -242,6 +248,7 @@ export default function PosClient({
       });
       if (!res.ok) throw new Error('Failed to complete & sync this work order.');
       setStatus('COMPLETED');
+      if (!isAdminPreview && !workOrder.invoiceId) setShowBillingBridge(true);
       router.refresh();
     } catch (e: any) {
       setError(e.message);
@@ -662,6 +669,8 @@ export default function PosClient({
           </div>
         </div>
       )}
+
+      {showBillingBridge && <BillingBridgeModal workOrderId={workOrder.id} onClose={() => setShowBillingBridge(false)} />}
     </div>
   );
 }

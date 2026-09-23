@@ -35,6 +35,16 @@ export default async function TechnicianLayout({ children }: { children: React.R
           <SignOutButton />
         </div>
       </header>
+      {!isAdminPreview && (
+        <nav className="sticky top-[52px] z-10 flex border-b border-slate-200 bg-white text-sm">
+          <Link href="/technician" className="flex-1 px-4 py-2.5 text-center font-medium text-ink-900 hover:bg-slate-50">
+            📋 Jobs
+          </Link>
+          <Link href="/technician/incentive" className="flex-1 px-4 py-2.5 text-center font-medium text-ink-900 hover:bg-slate-50">
+            💰 Incentive
+          </Link>
+        </nav>
+      )}
       <main className="px-4 py-4 pb-24">{children}</main>
     </div>
   );

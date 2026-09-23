@@ -12,6 +12,7 @@ import InvoiceDocument from '@/components/billing/invoice-document';
 import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
+import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts] = await Promise.all([
@@ -154,19 +155,44 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
                 <th className="py-2">Method</th>
                 <th className="py-2">Deposited To</th>
                 <th className="py-2">Reference</th>
+                <th className="py-2">Status</th>
                 <th className="py-2 text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {invoice.payments.map((p) => (
-                <tr key={p.id} className="border-t border-slate-100">
-                  <td className="py-2">{p.paidAt.toLocaleDateString()}</td>
-                  <td className="py-2">{p.method.replace('_', ' ')}</td>
-                  <td className="py-2 text-slate-500">{(p as any).bankAccount?.name ?? '—'}</td>
-                  <td className="py-2 text-slate-500">{p.reference ?? '—'}</td>
-                  <td className="py-2 text-right font-medium">{formatMoney(p.amount.toString(), currency)}</td>
-                </tr>
-              ))}
+              {invoice.payments.map((p) => {
+                const vs = (p as any).verificationStatus as 'NONE' | 'PENDING_REVIEW' | 'CONFIRMED' | 'MISMATCH';
+                const proofPhotoUrl = (p as any).proofPhotoUrl as string | null;
+                return (
+                  <tr key={p.id} className="border-t border-slate-100">
+                    <td className="py-2">{p.paidAt.toLocaleDateString()}</td>
+                    <td className="py-2">{p.method.replace('_', ' ')}</td>
+                    <td className="py-2 text-slate-500">{(p as any).bankAccount?.name ?? '—'}</td>
+                    <td className="py-2 text-slate-500">{p.reference ?? '—'}</td>
+                    <td className="py-2">
+                      {vs === 'NONE' || vs === 'CONFIRMED' ? (
+                        <span className="badge bg-emerald-100 text-emerald-700">Confirmed</span>
+                      ) : vs === 'MISMATCH' ? (
+                        <span className="badge bg-red-100 text-red-700">Mismatch — review photo</span>
+                      ) : (
+                        <span className="badge bg-amber-100 text-amber-700">Pending review</span>
+                      )}
+                      {(p as any).proofNotes && <p className="mt-1 text-xs text-slate-400">{(p as any).proofNotes}</p>}
+                      <div className="mt-1 flex items-center gap-3 print:hidden">
+                        {proofPhotoUrl && (
+                          <a href={proofPhotoUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand-600 hover:underline">
+                            View photo
+                          </a>
+                        )}
+                        {(vs === 'PENDING_REVIEW' || vs === 'MISMATCH') && (
+                          <ConfirmPaymentButton invoiceId={invoice.id} paymentId={p.id} />
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 text-right font-medium">{formatMoney(p.amount.toString(), currency)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

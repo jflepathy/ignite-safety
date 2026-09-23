@@ -84,6 +84,50 @@ export function computeDocumentTotals(
   return { subtotal, discountTotal, taxTotal, total, lines };
 }
 
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function threeDigitsToWords(n: number): string {
+  const parts: string[] = [];
+  if (n >= 100) {
+    parts.push(`${ONES[Math.floor(n / 100)]} Hundred`);
+    n %= 100;
+  }
+  if (n >= 20) {
+    parts.push(TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : ''));
+  } else if (n > 0) {
+    parts.push(ONES[n]);
+  }
+  return parts.join(' ');
+}
+
+/** Integer -> English words (supports up to billions — comfortably more
+ * than any real invoice amount). Used for cheque instructions on the
+ * technician payment-collection bridge (Session 16). */
+export function integerToWords(value: number): string {
+  if (value === 0) return 'Zero';
+  const groups = ['', ' Thousand', ' Million', ' Billion'];
+  let n = Math.floor(value);
+  const chunks: string[] = [];
+  let groupIdx = 0;
+  while (n > 0) {
+    const chunk = n % 1000;
+    if (chunk > 0) chunks.unshift(threeDigitsToWords(chunk) + groups[groupIdx]);
+    n = Math.floor(n / 1000);
+    groupIdx++;
+  }
+  return chunks.join(' ');
+}
+
+/** "One Hundred Forty-Eight and 50/100 SCR" — the cheque-writing style
+ * amount-in-words shown to a technician collecting a cheque payment. */
+export function amountInWords(amount: number, currency = 'SCR'): string {
+  const rounded = Math.round(amount * 100) / 100;
+  const whole = Math.floor(rounded);
+  const cents = Math.round((rounded - whole) * 100);
+  return `${integerToWords(whole)} and ${String(cents).padStart(2, '0')}/100 ${currency}`;
+}
+
 export function formatMoney(amount: number | string, currency = 'SCR'): string {
   const n = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('en-US', {

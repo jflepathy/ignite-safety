@@ -48,6 +48,7 @@ export default async function TechnicianJobPage({ params }: { params: { id: stri
         technicianNotes: wo.technicianNotes,
         serviceLines: (wo.serviceLines as any[]) ?? [],
         invoiceNumberIfIssued: wo.invoiceNumberIfIssued,
+        invoiceId: wo.invoiceId,
         customerSignedName: wo.customerSignedName,
         customerSignatureDataUrl: wo.customerSignatureDataUrl,
       }}

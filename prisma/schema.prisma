@@ -403,8 +403,53 @@ model ShopItem {
   purchaseOrderLines   PurchaseOrderLineItem[]
   billLines            BillLineItem[]
   inventoryAdjustments InventoryAdjustment[]
+  incentiveRates       IncentiveRate[]         @relation("IncentiveRateShopItem")
+  bundledInIncentiveRates IncentiveRate[]      @relation("IncentiveRateBundledItem")
 
   @@map("shop_items")
+}
+
+// ---------------------------------------------------------------------------
+// Technician Incentive Program (Session 16)
+// ---------------------------------------------------------------------------
+// One row per billable "service key" a technician's mobile POS can log
+// (matches the keys in src/components/technician/pos-client.tsx's
+// STANDARD_ITEMS / WORKSHOP_ACTIONS, e.g. "fext", "rust") plus a "_custom"
+// catch-all for a technician's free-text custom line. Drives three things:
+//  1. What a completed Work Order's serviceLines auto-populate onto a new
+//     draft invoice as (via shopItemId's price).
+//  2. How much of that price counts as the technician's incentive (either
+//     AppSettings.defaultIncentiveFraction, or this row's own override).
+//  3. Any item that's automatically bundled in (e.g. Servicing of F/Ext
+//     always also includes 1 x Service Tags).
+model IncentiveRate {
+  id    String @id @default(cuid())
+  key   String @unique // matches WorkOrder.serviceLines[].key, or "_custom" for a technician's free-text line
+  label String // shown in the admin Incentive Rates screen and technician Incentive tab
+
+  shopItemId String?
+  shopItem   ShopItem? @relation("IncentiveRateShopItem", fields: [shopItemId], references: [id])
+  // Left null for a key the catalog doesn't cover yet (e.g. "suppression",
+  // "valvechange" at launch) -- it still shows up in the admin screen
+  // (flagged as unmapped) and in a technician's Work Order, just with no
+  // price/incentive computed until an admin links or creates a ShopItem.
+
+  fractionOverride Decimal? @db.Decimal(5, 4) // null = use AppSettings.defaultIncentiveFraction
+  flatAmount       Decimal? @db.Decimal(12, 2) // if set, overrides the fraction entirely -- a fixed SCR amount per unit
+
+  // e.g. F/Ext servicing (key "fext") auto-bundles 1 x Service Tags (SRO001)
+  // onto the invoice/incentive calc for every unit serviced.
+  bundledShopItemId     String?
+  bundledShopItem       ShopItem? @relation("IncentiveRateBundledItem", fields: [bundledShopItemId], references: [id])
+  bundledQuantityPerUnit Decimal  @default(1) @db.Decimal(10, 2)
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("incentive_rates")
 }
 
 // ---------------------------------------------------------------------------
@@ -1262,9 +1307,29 @@ model Payment {
   recordedBy    User?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
   createdAt     DateTime      @default(now())
 
+  // ---- Technician-collected payment verification (Session 16) -------------
+  // Cash a technician collects on the spot is CONFIRMED immediately (the
+  // technician physically has it). A cheque or bank transfer instead gets a
+  // photo of the cheque / transfer confirmation, stored here, and starts
+  // PENDING_REVIEW until an AI vision pass (once ANTHROPIC_API_KEY is
+  // configured) or an admin manually confirms it matches the invoice
+  // amount -- only then does it count toward the invoice being marked Paid.
+  verificationStatus PaymentVerificationStatus @default(NONE)
+  proofPhotoUrl       String? // cheque / transfer-confirmation photo
+  proofNotes           String? // free text the technician or AI pass left (e.g. "cheque # 4471, amount matches")
+  verifiedAt           DateTime?
+  verifiedById         String? // null when confirmed automatically by the AI pass rather than a person
+
   @@index([invoiceId])
   @@index([bankAccountId])
   @@map("payments")
+}
+
+enum PaymentVerificationStatus {
+  NONE // normal office-recorded payment -- no proof-photo workflow involved
+  PENDING_REVIEW // technician submitted a cheque/transfer photo, awaiting confirmation
+  CONFIRMED // matched and counted -- either by the AI pass or an admin
+  MISMATCH // AI pass (or admin) flagged the photo as not matching the invoice
 }
 
 // ---------------------------------------------------------------------------
@@ -1394,6 +1459,20 @@ model AppSettings {
   // Order without capturing a customer name/signature — admin-only toggle
   // (Session 12).
   requireCustomerSignoff       Boolean @default(true)
+
+  // ---- Technician Incentive Program (Session 16) ---------------------------
+  // The default share of a service's price a technician earns as incentive
+  // (e.g. 0.20 = 1/5). Applies to any IncentiveRate row that doesn't set its
+  // own fractionOverride/flatAmount.
+  defaultIncentiveFraction Decimal @default(0.20) @db.Decimal(5, 4)
+  // Which bank account a technician's on-the-spot Cash/Cheque/Transfer
+  // collection (the "Receiving Payment" bridge) is deposited into. Plain id,
+  // no Prisma relation — AppSettings is a fixed singleton row (id=1), so a
+  // formal back-relation array on BankAccount isn't worth the schema noise;
+  // looked up manually where needed. Admin sets this once under Team ->
+  // Incentive Rates; until set, technician collection is blocked with a
+  // clear "ask admin to configure a collections account" message.
+  technicianCollectionsBankAccountId String?
 
   // ---- Tax & Financial Settings --------------------------------------------
   defaultTaxRateId      String?
