@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/status-badge';
@@ -44,6 +44,17 @@ const TYPE_BADGE_CLASS: Record<DocRow['docType'], string> = {
  * state, zero network round trips; the URL's `?tab=` is kept in sync
  * (via router.replace, non-blocking) purely for the sidebar highlight and
  * bookmarking/sharing.
+ *
+ * The reverse direction also has to work: clicking a sidebar link (e.g.
+ * "Overview" -> `/billing`, "Estimates" -> `/billing?tab=estimates`) is a
+ * real navigation, which re-runs the server-component page with the new
+ * `tab` search param and passes a new `initialTab` prop down here — but
+ * React does NOT re-initialize `useState(initialTab)` from a changed prop
+ * on an already-mounted component (only the first render uses that
+ * value), so without an explicit sync the tab strip and table just sat on
+ * whatever tab was active before the click, no matter which sidebar link
+ * was clicked. Fixed with the effect below, which re-applies `initialTab`
+ * whenever it actually changes.
  */
 export default function BillingTabsClient({
   currency,
@@ -57,6 +68,11 @@ export default function BillingTabsClient({
   const router = useRouter();
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    setTab(initialTab);
+    setQuery('');
+  }, [initialTab]);
 
   function selectTab(key: string) {
     setTab(key);
