@@ -83,6 +83,21 @@ function collectScopedPrintCss(doc: Document, scopeSelector: string): string {
  *    `@media print`) and has a proper white border. Fixed by inset-ing
  *    the image by that same 14mm/12mm on every page instead of drawing
  *    it full-bleed — see the margin math below.
+ * 5. (Round 5.) Font size still didn't match print — the clone used to
+ *    be captured at the LIVE on-screen width (`el.offsetWidth`, whatever
+ *    the browser window happened to be, e.g. ~896px), then that whole
+ *    image was squeezed down to fit the fixed A4 usable width. A real
+ *    browser print instead renders the same CSS pixels directly onto the
+ *    physical page (1 CSS px = 0.75pt, independent of window width) —
+ *    so on any screen wider than the print area, downloaded text came
+ *    out visibly smaller than printed text, and by an amount that
+ *    depended on the user's window size, not a fixed ratio. Fixed by
+ *    capturing the clone at the *print-equivalent* pixel width instead
+ *    (the width that, at 0.75pt/px, exactly fills the usable print
+ *    area) so wrapping and font size match print by construction, then
+ *    nudging the whole thing down by ~2pt (measured against this
+ *    template's dominant `text-sm`/14px body size) per the user's own
+ *    follow-up ask, once print and download actually matched.
  */
 export default function DownloadPdfButton({
   targetId,
@@ -109,6 +124,39 @@ export default function DownloadPdfButton({
       const jsPdfModule = await import('jspdf');
       const { jsPDF } = jsPdfModule;
 
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Same margins as the real @page print rule (globals.css, 14mm top/
+      // bottom, 12mm left/right) so the image doesn't bleed to the edge
+      // the way it used to — a plain top-left addImage(0,0,pageWidth,...)
+      // with no inset at all.
+      const MM_TO_PT = 2.834645669;
+      const marginTop = 14 * MM_TO_PT;
+      const marginBottom = 14 * MM_TO_PT;
+      const marginSide = 12 * MM_TO_PT;
+      const usableWidth = pageWidth - marginSide * 2;
+      const usableHeight = pageHeight - marginTop - marginBottom;
+
+      // A real browser print renders CSS pixels straight onto the physical
+      // page at 0.75pt per CSS px (96 CSS px/in, 72pt/in) — independent of
+      // the on-screen window width. To make the downloaded PDF's font size
+      // match that (rather than whatever ratio falls out of squeezing the
+      // live on-screen width into the page), capture the clone at the CSS
+      // pixel width that itself maps to the usable print area at that same
+      // 0.75pt/px, instead of the live `el.offsetWidth`.
+      const CSS_PX_TO_PT = 0.75;
+      const printEquivalentWidthPx = usableWidth / CSS_PX_TO_PT;
+
+      // Then shave a further ~2pt off the template's dominant body size
+      // (`text-sm`, 14px = 10.5pt at the ratio above) per the user's own
+      // follow-up — applied as one uniform scale-down so every size in the
+      // document shrinks together rather than just one.
+      const BODY_PX = 14;
+      const bodyPtAtFullSize = BODY_PX * CSS_PX_TO_PT;
+      const extraShrink = (bodyPtAtFullSize - 2) / bodyPtAtFullSize;
+
       // Clone the document off-screen (not display:none — that would break
       // layout) so we can force it into its "printed" appearance without
       // ever flashing that change on the real, visible page.
@@ -117,7 +165,7 @@ export default function DownloadPdfButton({
       offscreen.style.position = 'fixed';
       offscreen.style.top = '0';
       offscreen.style.left = '-10000px';
-      offscreen.style.width = `${el.offsetWidth}px`;
+      offscreen.style.width = `${printEquivalentWidthPx}px`;
       offscreen.style.pointerEvents = 'none';
       const clone = el.cloneNode(true) as HTMLElement;
       offscreen.appendChild(clone);
@@ -134,33 +182,21 @@ export default function DownloadPdfButton({
       });
       const imgData = canvas.toDataURL('image/png');
 
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      // Same margins as the real @page print rule (globals.css, 14mm top/
-      // bottom, 12mm left/right) so the image doesn't bleed to the edge
-      // the way it used to — a plain top-left addImage(0,0,pageWidth,...)
-      // with no inset at all.
-      const MM_TO_PT = 2.834645669;
-      const marginTop = 14 * MM_TO_PT;
-      const marginBottom = 14 * MM_TO_PT;
-      const marginSide = 12 * MM_TO_PT;
-      const usableWidth = pageWidth - marginSide * 2;
-      const usableHeight = pageHeight - marginTop - marginBottom;
-
-      const imgWidth = usableWidth;
+      const imgWidth = usableWidth * extraShrink;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Center the (now slightly narrower than usableWidth) image in the
+      // margin box rather than hugging the left margin.
+      const imgX = marginSide + (usableWidth - imgWidth) / 2;
 
       // Tile the (possibly page-spanning) image across as many pages as
       // needed, each time shifting it up by one page's worth of usable
       // height so the right slice lands inside that page's margin box.
       let consumed = 0;
-      pdf.addImage(imgData, 'PNG', marginSide, marginTop - consumed, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', imgX, marginTop - consumed, imgWidth, imgHeight);
       consumed += usableHeight;
       while (consumed < imgHeight) {
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', marginSide, marginTop - consumed, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', imgX, marginTop - consumed, imgWidth, imgHeight);
         consumed += usableHeight;
       }
 
