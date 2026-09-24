@@ -44,6 +44,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Chart of Accounts', href: '/accounting/chart-of-accounts' },
       { label: 'Reconcile', href: '/accounting/reconcile' },
+      { label: 'Reclassify Transactions', href: '/accounting/reclassify' },
       { label: 'Journal Entries', href: '/accounting/journal-entries' },
       { label: 'Audit Log', href: '/accounting/audit-log' },
     ],
@@ -98,6 +99,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Company & Account', href: '/admin' },
       { label: 'Lists & Tools', href: '/admin/lists-tools' },
       { label: 'Users', href: '/admin/users' },
+      { label: 'Recycle Bin', href: '/admin/recycle-bin' },
     ],
   },
 ];

@@ -26,7 +26,7 @@ export default async function CustomersPage() {
         </div>
         <NewCustomerButton />
       </div>
-      <CustomersTable customers={customers} canEdit={canEdit} />
+      <CustomersTable customers={customers} canEdit={canEdit} isAdmin={isAdmin} />
     </div>
   );
 }

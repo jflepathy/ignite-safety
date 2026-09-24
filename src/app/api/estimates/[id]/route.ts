@@ -124,3 +124,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(estimate);
 }
 
+// Session 22, round 10 — soft-delete into the Recycle Bin, admin-only. See
+// the matching comment on customers/[id]/route.ts's DELETE handler. Line
+// items cascade automatically (EstimateLineItem.estimate has onDelete:
+// Cascade), but that's irrelevant here since this never touches the row
+// itself — only deletedAt is set.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { session, error } = await requireRole('ADMIN');
+  if (error) return error;
+  const existing = await prisma.estimate.findUnique({ where: { id: params.id } });
+  if (!existing || existing.deletedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  await prisma.estimate.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+  await prisma.auditLog.create({
+    data: {
+      userId: session!.user.id,
+      action: 'ESTIMATE_DELETED',
+      entityType: 'Estimate',
+      entityId: params.id,
+      metadata: { estimateNumber: existing.estimateNumber },
+    },
+  });
+  return NextResponse.json({ ok: true });
+}
+

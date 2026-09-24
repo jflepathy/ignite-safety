@@ -142,8 +142,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { error } = await requireRole('ADMIN');
+  const { session, error } = await requireRole('ADMIN');
   if (error) return error;
+  const existing = await prisma.invoice.findUnique({ where: { id: params.id } });
+  if (!existing || existing.deletedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   await prisma.invoice.update({ where: { id: params.id }, data: { deletedAt: new Date(), status: 'VOID' } });
+  // Session 22, round 10 — this handler already existed (and voids the
+  // invoice on delete), but nothing in the UI ever called it and it never
+  // wrote an audit entry. Added the audit entry now that Delete is wired
+  // up from the invoice detail page and shows up in Settings > Recycle Bin.
+  await prisma.auditLog.create({
+    data: {
+      userId: session!.user.id,
+      action: 'INVOICE_DELETED',
+      entityType: 'Invoice',
+      entityId: params.id,
+      metadata: { invoiceNumber: existing.invoiceNumber },
+    },
+  });
   return NextResponse.json({ ok: true });
 }

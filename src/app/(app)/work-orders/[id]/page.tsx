@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { StatusBadge } from '@/components/status-badge';
 import AssignTechnicianForm from '@/components/work-orders/assign-technician-form';
+import DeleteRecordButton from '@/components/shared/delete-record-button';
 
 export default async function WorkOrderDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -52,6 +53,9 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
             <Link href={`/billing/invoices/${wo.invoice.id}`} className="btn-secondary">
               View Invoice {wo.invoice.invoiceNumber}
             </Link>
+          )}
+          {isAdmin && (
+            <DeleteRecordButton apiUrl={`/api/work-orders/${wo.id}`} recordLabel={wo.woNumber} redirectTo="/work-orders" />
           )}
         </div>
       </div>

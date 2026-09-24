@@ -24,7 +24,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   if (parsed.data.isDefault) {
-    await prisma.taxRate.updateMany({ data: { isDefault: false }, where: {} });
+    // Session 22, round 10 — was `updateMany`, discovered while building
+    // Transaction Reclassify that updateMany() itself (not just
+    // $transaction()/upsert()) gets wrapped in an implicit transaction by
+    // this Prisma version's query engine, which the Neon HTTP adapter
+    // can't run ("Transactions are not supported in HTTP mode") — so this
+    // was silently 500ing every time a new tax rate was created as the
+    // default. Sequential single-row updates avoid it, same fix as the
+    // PATCH handler below already used for the same reason.
+    const currentDefaults = await prisma.taxRate.findMany({ where: { isDefault: true } });
+    for (const tr of currentDefaults) {
+      await prisma.taxRate.update({ where: { id: tr.id }, data: { isDefault: false } });
+    }
   }
   const rate = await prisma.taxRate.create({ data: parsed.data });
   return NextResponse.json(rate, { status: 201 });

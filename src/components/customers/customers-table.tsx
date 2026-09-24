@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import QuickEditButton from '@/components/shared/quick-edit-button';
+import DeleteRecordButton from '@/components/shared/delete-record-button';
 
 type Customer = {
   id: string;
@@ -46,7 +47,15 @@ export const DISTRICTS_BY_REGION: Record<string, string[]> = {
   'Outer Islands': ['Outer Islands'],
 };
 
-export default function CustomersTable({ customers, canEdit }: { customers: Customer[]; canEdit: boolean }) {
+export default function CustomersTable({
+  customers,
+  canEdit,
+  isAdmin = false,
+}: {
+  customers: Customer[];
+  canEdit: boolean;
+  isAdmin?: boolean;
+}) {
   const [query, setQuery] = useState('');
 
   const filtered = customers.filter((c) => {
@@ -97,6 +106,7 @@ export default function CustomersTable({ customers, canEdit }: { customers: Cust
                 <td className="px-4 py-3">{c._count.invoices}</td>
                 {canEdit && (
                   <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
                     <QuickEditButton
                       title={`Edit ${c.displayName}`}
                       apiUrl={`/api/customers/${c.id}`}
@@ -156,6 +166,10 @@ export default function CustomersTable({ customers, canEdit }: { customers: Cust
                         { key: 'notes', label: 'Notes', type: 'textarea' },
                       ]}
                     />
+                    {isAdmin && (
+                      <DeleteRecordButton apiUrl={`/api/customers/${c.id}`} recordLabel={c.displayName} />
+                    )}
+                    </div>
                   </td>
                 )}
               </tr>

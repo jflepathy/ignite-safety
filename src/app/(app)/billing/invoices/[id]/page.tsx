@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
 import RecordPaymentForm from '@/components/billing/record-payment-form';
@@ -13,9 +15,10 @@ import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
 import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
+import DeleteRecordButton from '@/components/shared/delete-record-button';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
-  const [invoice, settings, bankAccounts] = await Promise.all([
+  const [invoice, settings, bankAccounts, session] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: params.id },
       include: {
@@ -27,8 +30,10 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.bankAccount.findMany({ orderBy: { name: 'asc' } }),
+    getServerSession(authOptions),
   ]);
   if (!invoice) notFound();
+  const isAdmin = session?.user.role === 'ADMIN';
 
   const attachments = await prisma.attachment.findMany({
     where: { entityType: 'Invoice', entityId: invoice.id },
@@ -123,6 +128,13 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           )}
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={invoice.invoiceNumber} />
+          {isAdmin && (
+            <DeleteRecordButton
+              apiUrl={`/api/invoices/${invoice.id}`}
+              recordLabel={invoice.invoiceNumber}
+              redirectTo="/billing?tab=documents"
+            />
+          )}
           <RecordPaymentForm
             invoiceId={invoice.id}
             balanceDue={Number(invoice.balanceDue)}

@@ -1,14 +1,17 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { StatusBadge } from '@/components/status-badge';
 import PrintButton from '@/components/print-button';
 import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/invoice-document';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
+import DeleteRecordButton from '@/components/shared/delete-record-button';
 
 export default async function EstimateDetailPage({ params }: { params: { id: string } }) {
-  const [estimate, settings] = await Promise.all([
+  const [estimate, settings, session] = await Promise.all([
     prisma.estimate.findUnique({
       where: { id: params.id },
       include: {
@@ -17,8 +20,10 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
       },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    getServerSession(authOptions),
   ]);
   if (!estimate) notFound();
+  const isAdmin = session?.user.role === 'ADMIN';
   const currency = settings?.currencyCode ?? 'SCR';
 
   const documentData: InvoiceDocumentData = {
@@ -88,6 +93,13 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           </Link>
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={estimate.estimateNumber} />
+          {isAdmin && (
+            <DeleteRecordButton
+              apiUrl={`/api/estimates/${estimate.id}`}
+              recordLabel={estimate.estimateNumber}
+              redirectTo="/billing?tab=estimates"
+            />
+          )}
         </div>
       </div>
 

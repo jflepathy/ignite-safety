@@ -35,3 +35,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const customer = await prisma.customer.update({ where: { id: params.id }, data: parsed.data });
   return NextResponse.json(customer);
 }
+
+// Session 22, round 10 — soft-delete into the Recycle Bin (Settings >
+// Recycle Bin), admin-only like the existing Invoice/WorkOrder DELETE
+// handlers. Deliberately no hard delete and no block on related
+// invoices/work orders/estimates: those keep their (already soft-deleted-
+// filtered-out) customerId reference and still display the customer's
+// name fine, since the row itself isn't removed, only flagged.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { session, error } = await requireRole('ADMIN');
+  if (error) return error;
+  const existing = await prisma.customer.findUnique({ where: { id: params.id } });
+  if (!existing || existing.deletedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  await prisma.customer.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+  await prisma.auditLog.create({
+    data: {
+      userId: session!.user.id,
+      action: 'CUSTOMER_DELETED',
+      entityType: 'Customer',
+      entityId: params.id,
+      metadata: { displayName: existing.displayName },
+    },
+  });
+  return NextResponse.json({ ok: true });
+}

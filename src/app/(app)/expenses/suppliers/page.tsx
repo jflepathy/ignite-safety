@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { canEditModule } from '@/lib/edit-permissions-constants';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
+import DeleteRecordButton from '@/components/shared/delete-record-button';
 
 export default async function SuppliersPage() {
   const [suppliers, session] = await Promise.all([
@@ -64,6 +65,7 @@ export default async function SuppliersPage() {
                 <td className="px-4 py-3">{s._count.purchaseOrders}</td>
                 {canEdit && (
                   <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
                     <QuickEditButton
                       title={`Edit ${s.displayName}`}
                       apiUrl={`/api/suppliers/${s.id}`}
@@ -88,6 +90,8 @@ export default async function SuppliersPage() {
                         { key: 'notes', label: 'Notes', type: 'textarea' },
                       ]}
                     />
+                    {isAdmin && <DeleteRecordButton apiUrl={`/api/suppliers/${s.id}`} recordLabel={s.displayName} />}
+                    </div>
                   </td>
                 )}
               </tr>
