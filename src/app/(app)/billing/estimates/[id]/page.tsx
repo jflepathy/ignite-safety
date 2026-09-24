@@ -90,7 +90,6 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           customerMessage={estimate.customerMessage}
           totalLabel="Total"
           showTaxNote={false}
-          headerGradient
         />
       </div>
     </div>

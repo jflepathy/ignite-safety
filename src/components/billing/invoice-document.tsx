@@ -28,13 +28,24 @@ type Settings = {
  * The canonical printable invoice layout, aligned to the company's
  * designated print/PDF template: company header + wordmark, BILL TO /
  * document-meta two-column block, ACTIVITY/DESCRIPTION/QTY/RATE/AMOUNT
- * line-item table, a dashed rule, a bold BALANCE DUE, a Payment Methods +
+ * line-item table, a dashed rule, a bold total line, a Payment Methods +
  * TIN footer block, and a closing "Thanking you for your business!" line.
  *
  * Used by both the authenticated invoice detail page and the public
  * unauthenticated share-link page so the two never drift apart. Wrap this
  * component in an element with class="print-area" to get clean, chrome-free
  * printing (see globals.css).
+ *
+ * Session 22 (round 2): this used to carry separate "screen" and "print"
+ * looks for several elements — a tinted/gradient header band, a shaded
+ * Bill To box, zebra-striped rows, a dark filled total block, rounded
+ * card corners — shown on screen but stripped down via `print:*` classes
+ * only when actually printed. The user found that inconsistent and asked
+ * for one uniform, simple look everywhere (screen, print, and downloaded
+ * PDF alike), matching the plain printed template. All of that shading
+ * was removed outright rather than conditionally hidden, so there is no
+ * longer a "screen version" and "print version" to keep in sync — what
+ * you see on screen is byte-for-byte what prints and what downloads.
  */
 export default function InvoiceDocument({
   settings,
@@ -58,7 +69,6 @@ export default function InvoiceDocument({
   customerMessage,
   totalLabel = 'Balance Due',
   showTaxNote = true,
-  headerGradient = false,
 }: {
   settings: Settings;
   documentLabel?: string;
@@ -88,26 +98,14 @@ export default function InvoiceDocument({
    * matching existing Invoice/Sales Receipt behavior; pass false to hide
    * it (e.g. on the Estimate, per request). */
   showTaxNote?: boolean;
-  /** Company header band background: a soft blue-to-white wash instead of
-   * the plain slate tint. Used by the Estimate print layout. */
-  headerGradient?: boolean;
 }) {
   const hasDiscount = Number(globalDiscountPercent) > 0 || lineItems.some((li) => Number(li.discountPercent) > 0);
   const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
 
   return (
-    <div
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white text-ink-900 print:rounded-none print:border-0"
-      style={{ fontFamily: '"Courier New", Courier, monospace' }}
-    >
+    <div className="bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
       {/* Company header band */}
-      <div
-        className={
-          headerGradient
-            ? 'flex items-start justify-between gap-6 border-b border-slate-100 bg-gradient-to-b from-sky-100 via-sky-50 to-white p-8 print:bg-white'
-            : 'flex items-start justify-between gap-6 border-b border-slate-100 bg-slate-50/60 p-8 print:bg-white'
-        }
-      >
+      <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-white p-8">
         <div>
           <p className="text-lg font-bold tracking-tight">{settings.companyName}</p>
           <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-500">{settings.companyAddress}</p>
@@ -136,7 +134,7 @@ export default function InvoiceDocument({
         </div>
 
         <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="rounded-lg bg-slate-50 p-4 text-sm print:bg-white print:p-0">
+          <div className="text-sm">
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Bill To</p>
             <p className="font-semibold text-ink-900">{customer.displayName}</p>
             <p className="whitespace-pre-line text-slate-500">{customer.address}</p>
@@ -183,8 +181,8 @@ export default function InvoiceDocument({
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((li, idx) => (
-              <tr key={li.id} className={idx % 2 === 1 ? 'bg-slate-50/70 print:bg-white' : undefined}>
+            {lineItems.map((li) => (
+              <tr key={li.id}>
                 <td className="py-2.5 pl-0 pr-2 align-top font-mono text-xs text-slate-500">{li.sku ?? '—'}</td>
                 <td className="py-2.5 pr-2 align-top">
                   {li.description}
@@ -254,9 +252,9 @@ export default function InvoiceDocument({
                 )}
               </div>
             )}
-            <div className="flex items-center justify-between rounded-lg bg-ink-900 px-4 py-3 text-white print:rounded-none print:bg-transparent print:px-0 print:text-ink-900">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-300 print:text-slate-500">{totalLabel}</span>
-              <span className="text-xl font-bold">{formatMoney(balanceDue, currency)}</span>
+            <div className="flex items-center justify-between border-t border-slate-200 py-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{totalLabel}</span>
+              <span className="text-xl font-bold text-ink-900">{formatMoney(balanceDue, currency)}</span>
             </div>
           </div>
         </div>
