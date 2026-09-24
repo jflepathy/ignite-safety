@@ -1004,11 +1004,85 @@ returned 403. All test data (customers, estimate, accounts, expense, both
 QA logins) deleted afterward; `estimateNextSeq` confirmed back at 1307
 (the test estimate briefly consumed "2026-1307" and was cleaned up before
 handing the number back). `tsc`/build clean. Deployed: version id
-`e47c2e40-4fae-482d-89eb-bd38fe0b2454`. Not yet pushed to GitHub — the
-link to the user's deploy machine was down at the time; pending sync, see
-the top of this note for current status once it lands.
+`e47c2e40-4fae-482d-89eb-bd38fe0b2454`. Pushed: commit `4195a2c`.
+
+**Session 22, round 11 (2026-09-24) — WhatsApp link sharing, Resend email
+scaffolding (PDF-attached), and a bank-statement finding that needs the
+user's decision before reconciliation import can proceed.**
+
+*WhatsApp.* The user chose the lighter interim option ("for now do the
+whatsapp link") over the full Meta Business API build-out. New
+`WhatsAppShareButton` on the Invoice detail page opens `wa.me` with a
+pre-filled message containing the invoice's existing public share link —
+no API, no new business phone number, no send-on-the-user's-behalf risk;
+WhatsApp opens with the message drafted and the user sends it themselves.
+Phone numbers in this app are stored as bare 7-digit local Seychelles
+numbers (confirmed via a live check of real customer records, e.g.
+`"2515001"`, occasionally messy free text like `"2857425\nMobile:
+2815586"`) — normalized to `248XXXXXXX` for `wa.me` when it cleanly
+matches a 7-digit number, left blank (letting WhatsApp's own contact
+picker open) rather than guessed when it doesn't. Estimates and Sales
+Receipts don't have a public share link/page at all yet, so this is
+Invoice-only for now, matching exactly what the user asked for.
+
+*Email.* Built for a real Resend integration, not a stub: `lib/email.ts`
+(a thin `fetch` wrapper around Resend's HTTP API, no SDK dependency, same
+pattern as the existing Gemini call in `payment-verification.ts`) and a
+new `POST /api/invoices/[id]/email` route that builds a genuine PDF
+attachment server-side via the same `buildDocumentPdf()` used for
+Download PDF (round 7) — confirmed by a direct production test that
+jsPDF runs fine in the Workers runtime; `loadLogo()`'s `FileReader`/
+`Image` calls (browser-only) simply throw there and get caught by its own
+existing try/catch, falling back to the text wordmark exactly as it
+already does on a fetch failure, so no code changes were needed for
+Workers-compatibility. New `EmailInvoiceButton` on the Invoice detail
+page; sends to the customer's email on file (disabled with an explanation
+if there isn't one), marks a DRAFT invoice SENT on successful send, logs
+an `INVOICE_EMAILED` audit entry. Requires two secrets not yet set —
+`RESEND_API_KEY` and `RESEND_FROM_EMAIL` (must be on a domain verified in
+the user's Resend account) — the user has agreed to sign up for Resend
+and provide these; until then the button fails gracefully with "Email
+sending is not set up yet" rather than a confusing error, confirmed live
+(sent against a real invoice with the key genuinely unset: got the
+expected 503, invoice status and audit log both unchanged — no partial
+side effects, no real send attempted). Once the key is in hand: `wrangler
+secret put RESEND_API_KEY` / `RESEND_FROM_EMAIL`, then a real end-to-end
+send needs to be live-verified before calling this done.
+
+*Bank statement / reconciliation — blocked on a decision, not yet built.*
+The user uploaded a real MCB statement (password-protected PDF, decrypted
+and inspected: 25 pages, Jan–Jun 2026, SCR savings account 00000213818).
+It turned out to be the user's **personal** MCB Savings Account, not the
+business's operating account — the vast majority of its lines are
+personal spending (ATM withdrawals, restaurant/supermarket card sales,
+Amazon, Spotify, a UK university payment, a family-to-family transfer),
+not Ignite Safety transactions. It does contain repeated "Transfer from
+OLB - EFT IGNITE SAFETY" credits and occasional "...Ignite Safety ...
+Return" debits, which look like they correspond to the business moving
+money to/from the user personally — plausibly matching the existing
+Chart-of-Accounts "1030 Personal Contribution JF Account", though nothing
+in the app currently tracks that relationship. Checked against the app's
+actual `BankAccount` records: only "Absa Current Account" and "Petty Cash
+Box" exist, neither is this MCB account, and neither has a stored account
+number to cross-check against. Building an automatic reconciliation
+matcher against this specific statement as given would mostly match
+nothing (personal spend has no corresponding Expense/Invoice/Deposit in
+the app) — asked the user which of two things they actually want: (a) the
+real business operating account statement (presumably Absa) instead, or
+(b) this personal account statement is intentional, scoped narrowly to
+reconciling just the business-transfer lines against "Personal
+Contribution JF Account". No importer or matching code written yet,
+correctly, until that's answered.
 
 **Pending — needs the user's input:**
+- **Resend setup**: the user needs to create a Resend account and hand
+  over an API key (and ideally verify a sending domain there, e.g.
+  `ignitesafety.shop`) before Invoice email delivery actually works
+  end-to-end — see round 11 above.
+- **Bank statement scope**: confirm whether reconciliation import should
+  target the real business bank account statement instead, or proceed
+  narrowly against the uploaded personal account for the business-related
+  transfer lines only — see round 11 above.
 - **A live click-through of Sessions 20–21's built features**
   (multi-technician split, self-service password change, barcode
   scanning, line reordering, and the Staff Incentive History section) —
@@ -1061,16 +1135,16 @@ project**, once the Session 7 backlog was clear — treat it as still
 pending user go-ahead, not silently in scope for the next session.
 
 ## Deployment path
-**Live as of Session 6 (2026-09-20/21), updated through Session 22 round 9
+**Live as of Session 6 (2026-09-20/21), updated through Session 22 round 10
 (2026-09-24): Cloudflare Workers (via OpenNext) + Neon (pooled + direct
 Postgres connections, `PrismaNeonHTTP` driver adapter), at its permanent
 domain.** Worker name `ignite-safety`, current version id
-`89d92d81-28b4-4a1e-8012-2228f92ecc16`. Canonical public URL:
+`e47c2e40-4fae-482d-89eb-bd38fe0b2454`. Canonical public URL:
 **`https://app.ignitesafety.shop`** (DNS cutover complete and verified,
 see Session 6 above); `https://ignite-safety.ignite-safety.workers.dev`
 still works as a fallback. Source pushed to
 `github.com/jflepathy/ignite-safety` (`main`, currently at commit
-`aeb56f6`). The originally-planned Supabase+Vercel path (see Session 1–5
+`4195a2c`). The originally-planned Supabase+Vercel path (see Session 1–5
 notes) was superseded by this Cloudflare+Neon path per the user's own
 cost/longevity comparison in Session 6 — README.md in the repo still
 describes the old path and should be treated as superseded by this doc

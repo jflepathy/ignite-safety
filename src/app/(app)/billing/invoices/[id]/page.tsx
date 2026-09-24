@@ -16,6 +16,8 @@ import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
 import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
+import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
+import EmailInvoiceButton from '@/components/billing/email-invoice-button';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts, session] = await Promise.all([
@@ -119,7 +121,18 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           )}
         </div>
         <div className="flex items-center gap-3">
+          <EmailInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} customerEmail={invoice.customer.email} />
           {invoice.shareToken && <ShareLinkButton path={`/share/invoice/${invoice.shareToken}`} />}
+          {invoice.shareToken && (
+            <WhatsAppShareButton
+              phone={invoice.customer.phone}
+              customerName={invoice.customer.displayName}
+              documentLabel="invoice"
+              documentNumber={invoice.invoiceNumber}
+              companyName={documentData.settings.companyName}
+              path={`/share/invoice/${invoice.shareToken}`}
+            />
+          )}
           <Link href={`/billing/invoices/${invoice.id}/edit`} className="btn-secondary">
             Edit
           </Link>
