@@ -4,21 +4,13 @@ import { useState } from 'react';
 
 /**
  * Pulls every rule inside an `@media print { ... }` block out of the live
- * page's stylesheets and returns them as plain (unconditional) CSS text.
- *
- * Why: html2canvas renders a snapshot of the DOM exactly as the *screen*
- * currently shows it — it has no concept of print media, so none of the
- * app's `print:*` Tailwind utilities (the ones that strip the colored
- * header down to white, hide the on-screen subtotal/discount/tax
- * breakdown, drop the rounded card corners, etc. — see the `.print-area`
- * block in globals.css) ever take effect in a downloaded PDF. That's
- * exactly why "Download PDF" used to look different from actually
- * printing the same document (Invoice, Estimate, and Sales Receipt all
- * share this one button, so all three were affected). Re-injecting the
- * print rules unconditionally into the clone html2canvas renders from
- * makes the two paths produce the same page.
+ * page's stylesheets, rewrites each selector so it only matches inside
+ * `scopeSelector`, and returns the result as plain (unconditional) CSS
+ * text. Used to make an off-screen clone of a document look exactly like
+ * it would when actually printed, without ever touching the live page's
+ * own styling (see `handleClick` below for why it needs a clone at all).
  */
-function collectPrintOnlyCss(doc: Document): string {
+function collectScopedPrintCss(doc: Document, scopeSelector: string): string {
   let css = '';
   for (const sheet of Array.from(doc.styleSheets)) {
     let rules: CSSRuleList;
@@ -30,7 +22,17 @@ function collectPrintOnlyCss(doc: Document): string {
     for (const rule of Array.from(rules)) {
       if (rule instanceof CSSMediaRule && rule.media.mediaText.includes('print')) {
         for (const inner of Array.from(rule.cssRules)) {
-          css += inner.cssText + '\n';
+          if (inner instanceof CSSStyleRule) {
+            const scoped = inner.selectorText
+              .split(',')
+              .map((s) => `${scopeSelector} ${s.trim()}`)
+              .join(', ');
+            css += `${scoped} { ${inner.style.cssText} }\n`;
+          } else {
+            // A nested at-rule (rare inside @media print here) — keep as-is
+            // rather than trying to rewrite its selector.
+            css += inner.cssText + '\n';
+          }
         }
       }
     }
@@ -39,13 +41,41 @@ function collectPrintOnlyCss(doc: Document): string {
 }
 
 /**
- * Renders the element at `targetId` to a real PDF file (via html2canvas +
- * jsPDF, entirely client-side) and saves it straight to the browser's
- * default download location — no "Save As" dialog, no confirmation step,
- * because jsPDF's save() triggers a plain <a download> click under the hood
- * (Session 11). The filename is the document's own form number so it lands
- * in Downloads already named sensibly. The captured snapshot is made to
- * match actual printing (Session 22) via `collectPrintOnlyCss` above.
+ * Renders the element at `targetId` to a real PDF file and saves it
+ * straight to the browser's default download location — no "Save As"
+ * dialog, no confirmation step, because jsPDF's save() triggers a plain
+ * <a download> click under the hood (Session 11). The filename is the
+ * document's own form number so it lands in Downloads already named
+ * sensibly.
+ *
+ * Session 22 history, both fixes needed together:
+ *
+ * 1. This used to render via html2canvas, which reimplements CSS layout
+ *    and painting from scratch instead of using the browser's own
+ *    rendering engine. It has no concept of print media (so none of this
+ *    app's `print:*` Tailwind utilities — the ones that strip the header
+ *    to plain white, hide the on-screen subtotal/discount/tax breakdown,
+ *    and drop the rounded card corners for a clean printed page — ever
+ *    took effect), which was the first fix attempted here. But it also
+ *    turned out not to understand Tailwind's modern
+ *    `rgb(r g b / var(--tw-*-opacity))` color syntax or its gradient
+ *    custom properties at all, and would silently fall back to the
+ *    browser's default font/colors for anything that used them — visibly
+ *    wrong text color and a completely wrong (non-monospace) font  in the
+ *    downloaded PDF, confirmed by downloading a real Estimate and
+ *    comparing it side-by-side with an actual print of the same one.
+ *    html2canvas is effectively unmaintained and this is a known
+ *    limitation of it, not something fixable by tweaking its options.
+ * 2. Fix: render via `html-to-image` instead, which (via an SVG
+ *    `<foreignObject>`) hands the actual HTML/CSS to the browser's own
+ *    renderer rather than reimplementing it, so modern CSS just works.
+ * 3. To still make the *printed* look win over the *on-screen* look (an
+ *    Estimate's on-screen subtotal breakdown and blue header shouldn't
+ *    appear in the downloaded PDF, matching actual printing), the
+ *    target element is cloned into an off-screen container first, the
+ *    print-only CSS rules are re-injected there — scoped so they only
+ *    ever apply inside that detached clone — and only the clone is
+ *    captured. Nothing about the live, visible page is touched.
  */
 export default function DownloadPdfButton({
   targetId,
@@ -62,26 +92,38 @@ export default function DownloadPdfButton({
   async function handleClick() {
     setError('');
     setWorking(true);
+    let offscreen: HTMLDivElement | null = null;
+    let styleTag: HTMLStyleElement | null = null;
     try {
       const el = document.getElementById(targetId);
       if (!el) throw new Error('Nothing found to export.');
 
-      const [{ default: html2canvas }, jsPdfModule] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
+      const htmlToImage = await import('html-to-image');
+      const jsPdfModule = await import('jspdf');
       const { jsPDF } = jsPdfModule;
 
-      const printCss = collectPrintOnlyCss(document);
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
+      // Clone the document off-screen (not display:none — that would break
+      // layout) so we can force it into its "printed" appearance without
+      // ever flashing that change on the real, visible page.
+      offscreen = document.createElement('div');
+      offscreen.setAttribute('data-pdf-export-root', '');
+      offscreen.style.position = 'fixed';
+      offscreen.style.top = '0';
+      offscreen.style.left = '-10000px';
+      offscreen.style.width = `${el.offsetWidth}px`;
+      offscreen.style.pointerEvents = 'none';
+      const clone = el.cloneNode(true) as HTMLElement;
+      offscreen.appendChild(clone);
+      document.body.appendChild(offscreen);
+
+      styleTag = document.createElement('style');
+      styleTag.textContent = collectScopedPrintCss(document, '[data-pdf-export-root]');
+      document.head.appendChild(styleTag);
+
+      const canvas = await htmlToImage.toCanvas(clone, {
         backgroundColor: '#ffffff',
-        onclone: (clonedDoc) => {
-          const style = clonedDoc.createElement('style');
-          style.textContent = printCss;
-          clonedDoc.head.appendChild(style);
-        },
+        pixelRatio: 2,
+        cacheBust: true,
       });
       const imgData = canvas.toDataURL('image/png');
 
@@ -106,6 +148,8 @@ export default function DownloadPdfButton({
     } catch (e: any) {
       setError(e?.message ?? 'Could not generate PDF.');
     } finally {
+      offscreen?.remove();
+      styleTag?.remove();
       setWorking(false);
     }
   }
