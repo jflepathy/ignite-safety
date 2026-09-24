@@ -48,7 +48,7 @@ function collectScopedPrintCss(doc: Document, scopeSelector: string): string {
  * document's own form number so it lands in Downloads already named
  * sensibly.
  *
- * Session 22 history, both fixes needed together:
+ * Session 22 history:
  *
  * 1. This used to render via html2canvas, which reimplements CSS layout
  *    and painting from scratch instead of using the browser's own
@@ -76,6 +76,13 @@ function collectScopedPrintCss(doc: Document, scopeSelector: string): string {
  *    print-only CSS rules are re-injected there — scoped so they only
  *    ever apply inside that detached clone — and only the clone is
  *    captured. Nothing about the live, visible page is touched.
+ * 4. (Round 4.) The page size was already correct A4 — the actual
+ *    complaint was that the downloaded PDF had the captured image
+ *    stretched edge-to-edge with zero margin, while an actual browser
+ *    print goes through `@page { margin: 14mm 12mm }` (globals.css,
+ *    `@media print`) and has a proper white border. Fixed by inset-ing
+ *    the image by that same 14mm/12mm on every page instead of drawing
+ *    it full-bleed — see the margin math below.
  */
 export default function DownloadPdfButton({
   targetId,
@@ -130,18 +137,31 @@ export default function DownloadPdfButton({
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
+
+      // Same margins as the real @page print rule (globals.css, 14mm top/
+      // bottom, 12mm left/right) so the image doesn't bleed to the edge
+      // the way it used to — a plain top-left addImage(0,0,pageWidth,...)
+      // with no inset at all.
+      const MM_TO_PT = 2.834645669;
+      const marginTop = 14 * MM_TO_PT;
+      const marginBottom = 14 * MM_TO_PT;
+      const marginSide = 12 * MM_TO_PT;
+      const usableWidth = pageWidth - marginSide * 2;
+      const usableHeight = pageHeight - marginTop - marginBottom;
+
+      const imgWidth = usableWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
+      // Tile the (possibly page-spanning) image across as many pages as
+      // needed, each time shifting it up by one page's worth of usable
+      // height so the right slice lands inside that page's margin box.
+      let consumed = 0;
+      pdf.addImage(imgData, 'PNG', marginSide, marginTop - consumed, imgWidth, imgHeight);
+      consumed += usableHeight;
+      while (consumed < imgHeight) {
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        pdf.addImage(imgData, 'PNG', marginSide, marginTop - consumed, imgWidth, imgHeight);
+        consumed += usableHeight;
       }
 
       pdf.save(`${fileName}.pdf`);
