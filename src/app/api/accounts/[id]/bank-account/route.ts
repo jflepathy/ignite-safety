@@ -60,3 +60,49 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
   return NextResponse.json(bankAccount, { status: 201 });
 }
+
+/**
+ * Reverses the POST above — removes the Asset account from every "Deposit
+ * To" picker by deleting its BankAccount row. Deliberately refuses when
+ * the account has any real history against it (a recorded Payment,
+ * Deposit, or BankTransaction) rather than silently deleting and orphaning
+ * that history, or worse, cascading it away — this table has no separate
+ * "enabled" flag to just flip off, and payments/deposits keep a hard
+ * `bankAccountId` reference, so an unused link is the only kind that's
+ * ever actually safe to remove outright.
+ */
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await requireEdit('chartOfAccounts', 'ADMIN', 'SALES');
+  if (error) return error;
+
+  const account = await prisma.account.findUnique({
+    where: { id: params.id },
+    include: { bankAccount: true },
+  });
+  if (!account) return NextResponse.json({ error: 'Account not found.' }, { status: 404 });
+  if (!account.bankAccount) {
+    return NextResponse.json({ error: 'This account is not enabled for deposits.' }, { status: 409 });
+  }
+
+  const bankAccountId = account.bankAccount.id;
+  const [paymentCount, depositCount, transactionCount] = await Promise.all([
+    prisma.payment.count({ where: { bankAccountId } }),
+    prisma.deposit.count({ where: { bankAccountId } }),
+    prisma.bankTransaction.count({ where: { bankAccountId } }),
+  ]);
+  if (paymentCount + depositCount + transactionCount > 0) {
+    const parts: string[] = [];
+    if (paymentCount) parts.push(`${paymentCount} payment${paymentCount === 1 ? '' : 's'}`);
+    if (depositCount) parts.push(`${depositCount} deposit${depositCount === 1 ? '' : 's'}`);
+    if (transactionCount) parts.push(`${transactionCount} bank transaction${transactionCount === 1 ? '' : 's'}`);
+    return NextResponse.json(
+      {
+        error: `Can't remove — this account has ${parts.join(', ')} recorded against it. Removing it would orphan that history. Reconcile or reassign that activity first if you really need to disable it.`,
+      },
+      { status: 409 }
+    );
+  }
+
+  await prisma.bankAccount.delete({ where: { id: bankAccountId } });
+  return NextResponse.json({ ok: true });
+}

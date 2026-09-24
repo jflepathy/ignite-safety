@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { canEditModule } from '@/lib/edit-permissions-constants';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
+import RemoveDepositAccountButton from '@/components/accounting/remove-deposit-account-button';
 
 const TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'];
 
@@ -110,6 +111,9 @@ export default async function ChartOfAccountsPage() {
                                 { key: 'currencyCode', label: 'Currency', defaultValue: currencyCode },
                               ]}
                             />
+                          )}
+                          {a.type === 'ASSET' && a.bankAccount && (
+                            <RemoveDepositAccountButton accountId={a.id} accountName={a.name} />
                           )}
                           <QuickEditButton
                             title={`Edit ${a.name}`}
