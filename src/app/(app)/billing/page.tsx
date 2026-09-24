@@ -13,13 +13,22 @@ export default async function BillingPage({
 }) {
   const session = await getServerSession(authOptions);
   const currency = 'SCR';
-  const tab = searchParams.tab ?? 'invoices';
+  const tab = searchParams.tab ?? 'all';
 
-  const [settings, invoices, estimates, creditNotes] = await Promise.all([
+  const [settings, invoices, salesReceipts, estimates, creditNotes] = await Promise.all([
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.invoice.findMany({
       where: { deletedAt: null },
       include: { customer: true, payments: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
+    // Invoices and Sales Receipts draw from the same shared numbering
+    // sequence (invoiceNextSeq/invoicePrefix — see the Sales Receipt POST
+    // route) and are shown together as one "Invoice & Sales Receipts" tab
+    // below, rather than two separate lists.
+    prisma.salesReceipt.findMany({
+      include: { customer: true },
       orderBy: { createdAt: 'desc' },
       take: 100,
     }),
@@ -149,35 +158,69 @@ export default async function BillingPage({
         </div>
       )}
 
+      {/* One unified, date-sorted row set backs every tab below — "All" is
+          the whole thing, "Estimates" / "Invoice & Sales Receipts" /
+          "Credit Notes" are just client-side filters of it by docType, so
+          there is exactly one table implementation and one sort order to
+          keep consistent instead of four. Invoices and Sales Receipts are
+          combined into the same docType group since they share one
+          numbering sequence (see the query above). */}
       <BillingTabsClient
         currency={curr}
         initialTab={tab}
-        invoices={invoices.map((inv) => ({
-          id: inv.id,
-          invoiceNumber: inv.invoiceNumber,
-          customerName: inv.customer.displayName,
-          issueDate: inv.issueDate.toLocaleDateString(),
-          dueDate: inv.dueDate ? inv.dueDate.toLocaleDateString() : null,
-          total: inv.total.toString(),
-          balanceDue: inv.balanceDue.toString(),
-          status: inv.status,
-        }))}
-        estimates={estimates.map((es) => ({
-          id: es.id,
-          estimateNumber: es.estimateNumber,
-          customerName: es.customer.displayName,
-          issueDate: es.issueDate.toLocaleDateString(),
-          total: es.total.toString(),
-          status: es.status,
-        }))}
-        creditNotes={creditNotes.map((cn) => ({
-          id: cn.id,
-          creditNoteNumber: cn.creditNoteNumber,
-          customerName: cn.customer.displayName,
-          relatedInvoiceNumber: cn.invoice?.invoiceNumber ?? null,
-          total: cn.total.toString(),
-          status: cn.status,
-        }))}
+        docs={[
+          ...invoices.map((inv) => ({
+            id: inv.id,
+            docType: 'invoice' as const,
+            number: inv.invoiceNumber,
+            href: `/billing/invoices/${inv.id}`,
+            customerName: inv.customer.displayName,
+            date: inv.issueDate.toLocaleDateString(),
+            dateSort: inv.issueDate.toISOString(),
+            total: inv.total.toString(),
+            balanceDue: inv.balanceDue.toString(),
+            status: inv.status,
+          })),
+          ...salesReceipts.map((r) => ({
+            id: r.id,
+            docType: 'salesReceipt' as const,
+            number: r.receiptNumber,
+            href: `/billing/sales-receipts/${r.id}`,
+            customerName: r.customer.displayName,
+            date: r.saleDate.toLocaleDateString(),
+            dateSort: r.saleDate.toISOString(),
+            total: r.total.toString(),
+            balanceDue: null,
+            status: 'PAID',
+          })),
+          ...estimates.map((es) => ({
+            id: es.id,
+            docType: 'estimate' as const,
+            number: es.estimateNumber,
+            href: `/billing/estimates/${es.id}`,
+            customerName: es.customer.displayName,
+            date: es.issueDate.toLocaleDateString(),
+            dateSort: es.issueDate.toISOString(),
+            total: es.total.toString(),
+            balanceDue: null,
+            status: es.status,
+          })),
+          ...creditNotes.map((cn) => ({
+            id: cn.id,
+            docType: 'creditNote' as const,
+            number: cn.creditNoteNumber,
+            // No credit note detail page exists yet (unlike Invoice/
+            // Estimate/Sales Receipt) — kept as plain, non-clickable text,
+            // matching how the old Credit Notes tab always rendered it.
+            href: null,
+            customerName: cn.customer.displayName,
+            date: cn.createdAt.toLocaleDateString(),
+            dateSort: cn.createdAt.toISOString(),
+            total: cn.total.toString(),
+            balanceDue: null,
+            status: cn.status,
+          })),
+        ].sort((a, b) => (a.dateSort < b.dateSort ? 1 : -1))}
       />
     </div>
   );

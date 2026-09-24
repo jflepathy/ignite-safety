@@ -16,9 +16,11 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: '💳',
     items: [
       { label: 'Overview', href: '/billing' },
-      { label: 'Invoices', href: '/billing?tab=invoices' },
       { label: 'Estimates', href: '/billing?tab=estimates' },
-      { label: 'Sales Receipts', href: '/billing/sales-receipts' },
+      // Invoices and Sales Receipts share one numbering sequence (see
+      // billing/page.tsx) and live together in the Overview page's
+      // "Invoice & Sales Receipts" tab rather than as two separate lists.
+      { label: 'Invoice & Sales Receipts', href: '/billing?tab=documents' },
       { label: 'Customers', href: '/customers' },
       { label: 'Products & Services', href: '/admin/catalog' },
       { label: 'Reports', href: '/billing/reports' },

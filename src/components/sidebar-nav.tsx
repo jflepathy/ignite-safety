@@ -27,11 +27,12 @@ export default function SidebarNav({ isAdmin, moduleVisibility }: { isAdmin: boo
 
   // Several nav hrefs can legitimately match the same URL at once — a
   // parent link like "/outreach" is a path-prefix of its own child
-  // "/outreach/requests", and tab links like "/billing?tab=invoices" share
+  // "/outreach/requests", and tab links like "/billing?tab=documents" share
   // a pathname with their group's plain "/billing" landing link. Comparing
   // each href in isolation (the previous implementation) lit up every one
-  // of those simultaneously — e.g. Overview + Invoices + Estimates all
-  // highlighted together, or Outreach + Servicing Requests both highlighted
+  // of those simultaneously — e.g. Overview + Invoice & Sales Receipts +
+  // Estimates all highlighted together, or Outreach + Servicing Requests
+  // both highlighted
   // — which is exactly the "highlight stuck on the previous item" bug.
   // Instead, score every href in the sidebar and let only the single most
   // specific match win: an exact query-param match always beats a bare

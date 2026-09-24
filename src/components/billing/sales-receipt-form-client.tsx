@@ -34,7 +34,7 @@ export default function SalesReceiptFormClient({
       taxRates={taxRates}
       currency={currency}
       apiUrl="/api/sales-receipts"
-      redirectPath="/billing/sales-receipts"
+      redirectPath="/billing?tab=documents"
       printableDetailPath="/billing/sales-receipts"
       documentLabel="Sales Receipt"
       enablePartyCombobox

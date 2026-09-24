@@ -1,209 +1,176 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/status-badge';
 import { formatMoney } from '@/lib/money';
 
-type InvoiceRow = {
+export type DocRow = {
   id: string;
-  invoiceNumber: string;
+  docType: 'invoice' | 'salesReceipt' | 'estimate' | 'creditNote';
+  number: string;
+  href: string | null;
   customerName: string;
-  issueDate: string;
-  dueDate: string | null;
+  date: string;
+  dateSort: string;
   total: string;
-  balanceDue: string;
+  balanceDue: string | null;
   status: string;
 };
 
-type EstimateRow = {
-  id: string;
-  estimateNumber: string;
-  customerName: string;
-  issueDate: string;
-  total: string;
-  status: string;
+const TYPE_LABEL: Record<DocRow['docType'], string> = {
+  invoice: 'Invoice',
+  salesReceipt: 'Sales Receipt',
+  estimate: 'Estimate',
+  creditNote: 'Credit Note',
 };
 
-type CreditNoteRow = {
-  id: string;
-  creditNoteNumber: string;
-  customerName: string;
-  relatedInvoiceNumber: string | null;
-  total: string;
-  status: string;
+const TYPE_BADGE_CLASS: Record<DocRow['docType'], string> = {
+  invoice: 'bg-blue-50 text-blue-700',
+  salesReceipt: 'bg-emerald-50 text-emerald-700',
+  estimate: 'bg-amber-50 text-amber-700',
+  creditNote: 'bg-slate-100 text-slate-600',
 };
 
 /**
- * Renders the Invoices/Estimates/Credit Notes tab strip + tables entirely
- * client-side. All three datasets are fetched once, server-side, in
- * billing/page.tsx and handed down as plain (already-serialized) props —
- * switching tabs is a local state update with zero network round trip, so
- * it's instant instead of triggering a full page reload. The URL is still
- * kept in sync (via router.replace, fired after the local state update so
- * it never blocks the visible switch) purely so the sidebar highlight and
- * bookmarking/sharing keep working.
+ * One unified row table drives every tab on Billing > Overview — "All" is
+ * the whole `docs` array (already sorted newest-first server-side, across
+ * Invoice/Sales Receipt/Estimate/Credit Note), and the other three tabs
+ * are just client-side `docType` filters of the same array. Invoice and
+ * Sales Receipt share one docType group ("Invoice & Sales Receipts")
+ * since they're drawn from the same numbering sequence — see billing/
+ * page.tsx. Switching tabs and typing in the search box are both local
+ * state, zero network round trips; the URL's `?tab=` is kept in sync
+ * (via router.replace, non-blocking) purely for the sidebar highlight and
+ * bookmarking/sharing.
  */
 export default function BillingTabsClient({
   currency,
   initialTab,
-  invoices,
-  estimates,
-  creditNotes,
+  docs,
 }: {
   currency: string;
   initialTab: string;
-  invoices: InvoiceRow[];
-  estimates: EstimateRow[];
-  creditNotes: CreditNoteRow[];
+  docs: DocRow[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState(initialTab);
+  const [query, setQuery] = useState('');
 
   function selectTab(key: string) {
     setTab(key);
+    setQuery('');
     // Non-blocking: the table below already switched via local state above,
     // this just keeps the address bar / sidebar highlight in sync.
     router.replace(`/billing?tab=${key}`, { scroll: false });
   }
 
+  const byType = useMemo(() => {
+    const groups: Record<string, DocRow[]> = {
+      all: docs,
+      estimates: docs.filter((d) => d.docType === 'estimate'),
+      documents: docs.filter((d) => d.docType === 'invoice' || d.docType === 'salesReceipt'),
+      'credit-notes': docs.filter((d) => d.docType === 'creditNote'),
+    };
+    return groups;
+  }, [docs]);
+
   const tabs = [
-    { key: 'invoices', label: `Invoices (${invoices.length})` },
-    { key: 'estimates', label: `Estimates (${estimates.length})` },
-    { key: 'credit-notes', label: `Credit Notes (${creditNotes.length})` },
+    { key: 'all', label: `All (${byType.all.length})` },
+    { key: 'estimates', label: `Estimates (${byType.estimates.length})` },
+    { key: 'documents', label: `Invoice & Sales Receipts (${byType.documents.length})` },
+    { key: 'credit-notes', label: `Credit Notes (${byType['credit-notes'].length})` },
   ];
+
+  const activeRows = byType[tab] ?? byType.all;
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return activeRows;
+    return activeRows.filter(
+      (d) => d.number.toLowerCase().includes(q) || d.customerName.toLowerCase().includes(q)
+    );
+  }, [activeRows, query]);
+
+  const showTypeColumn = tab === 'all' || tab === 'documents';
 
   return (
     <div className="card">
-      <div className="flex gap-1 border-b border-slate-200 px-4 pt-3">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => selectTab(t.key)}
-            className={`rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t.key ? 'border-b-2 border-brand-600 text-brand-700' : 'text-slate-500 hover:text-ink-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 pt-3">
+        <div className="flex flex-wrap gap-1">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => selectTab(t.key)}
+              className={`rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${
+                tab === t.key ? 'border-b-2 border-brand-600 text-brand-700' : 'text-slate-500 hover:text-ink-800'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="pb-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by number or customer…"
+            className="input w-56"
+          />
+        </div>
       </div>
 
-      {tab === 'invoices' && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Issue Date</th>
-              <th className="px-4 py-3">Due Date</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-right">Balance</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="border-b border-slate-50 hover:bg-slate-50">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+            {showTypeColumn && <th className="px-4 py-3">Type</th>}
+            <th className="px-4 py-3">Number</th>
+            <th className="px-4 py-3">Customer</th>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3 text-right">Total</th>
+            <th className="px-4 py-3 text-right">Balance</th>
+            <th className="px-4 py-3">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredRows.map((d) => (
+            <tr key={`${d.docType}-${d.id}`} className="border-b border-slate-50 hover:bg-slate-50">
+              {showTypeColumn && (
                 <td className="px-4 py-3">
-                  <Link href={`/billing/invoices/${inv.id}`} className="font-medium text-brand-700 hover:underline">
-                    {inv.invoiceNumber}
+                  <span className={`badge ${TYPE_BADGE_CLASS[d.docType]}`}>{TYPE_LABEL[d.docType]}</span>
+                </td>
+              )}
+              <td className="px-4 py-3">
+                {d.href ? (
+                  <Link href={d.href} className="font-medium text-brand-700 hover:underline">
+                    {d.number}
                   </Link>
-                </td>
-                <td className="px-4 py-3">{inv.customerName}</td>
-                <td className="px-4 py-3 text-slate-500">{inv.issueDate}</td>
-                <td className="px-4 py-3 text-slate-500">{inv.dueDate ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{formatMoney(inv.total, currency)}</td>
-                <td className="px-4 py-3 text-right font-medium">{formatMoney(inv.balanceDue, currency)}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={inv.status} />
-                </td>
-              </tr>
-            ))}
-            {invoices.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
-                  No invoices yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      {tab === 'estimates' && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
-              <th className="px-4 py-3">Estimate #</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Issue Date</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Status</th>
+                ) : (
+                  <span className="font-medium text-ink-900">{d.number}</span>
+                )}
+              </td>
+              <td className="px-4 py-3">{d.customerName}</td>
+              <td className="px-4 py-3 text-slate-500">{d.date}</td>
+              <td className="px-4 py-3 text-right">{formatMoney(d.total, currency)}</td>
+              <td className="px-4 py-3 text-right font-medium">
+                {d.balanceDue !== null ? formatMoney(d.balanceDue, currency) : '—'}
+              </td>
+              <td className="px-4 py-3">
+                <StatusBadge status={d.status} />
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {estimates.map((es) => (
-              <tr key={es.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3">
-                  <Link href={`/billing/estimates/${es.id}`} className="font-medium text-brand-700 hover:underline">
-                    {es.estimateNumber}
-                  </Link>
-                </td>
-                <td className="px-4 py-3">{es.customerName}</td>
-                <td className="px-4 py-3 text-slate-500">{es.issueDate}</td>
-                <td className="px-4 py-3 text-right">{formatMoney(es.total, currency)}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={es.status} />
-                </td>
-              </tr>
-            ))}
-            {estimates.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                  No estimates yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      {tab === 'credit-notes' && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
-              <th className="px-4 py-3">Credit Note #</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Related Invoice</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Status</th>
+          ))}
+          {filteredRows.length === 0 && (
+            <tr>
+              <td colSpan={showTypeColumn ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
+                {query ? 'No matches.' : 'Nothing here yet.'}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {creditNotes.map((cn) => (
-              <tr key={cn.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-ink-900">{cn.creditNoteNumber}</td>
-                <td className="px-4 py-3">{cn.customerName}</td>
-                <td className="px-4 py-3 text-slate-500">{cn.relatedInvoiceNumber ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{formatMoney(cn.total, currency)}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={cn.status} />
-                </td>
-              </tr>
-            ))}
-            {creditNotes.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                  No credit notes yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

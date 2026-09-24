@@ -32,7 +32,7 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/billing/sales-receipts" className="btn-secondary">
+          <Link href="/billing?tab=documents" className="btn-secondary">
             ← Back
           </Link>
           <Link href={`/billing/sales-receipts/${receipt.id}/edit`} className="btn-secondary">
