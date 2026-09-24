@@ -8,12 +8,14 @@ import QuickEditButton from '@/components/shared/quick-edit-button';
 const TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'];
 
 export default async function ChartOfAccountsPage() {
-  const [accounts, session] = await Promise.all([
-    prisma.account.findMany({ orderBy: { code: 'asc' } }),
+  const [accounts, session, settings] = await Promise.all([
+    prisma.account.findMany({ orderBy: { code: 'asc' }, include: { bankAccount: true } }),
     getServerSession(authOptions),
+    prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
   const isAdmin = session?.user.role === 'ADMIN';
   const canEdit = canEditModule('chartOfAccounts', isAdmin, session?.user.editModules);
+  const currencyCode = settings?.currencyCode ?? 'SCR';
 
   const grouped = TYPES.map((type) => ({ type, accounts: accounts.filter((a) => a.type === type) }));
 
@@ -66,29 +68,68 @@ export default async function ChartOfAccountsPage() {
                 {g.accounts.map((a) => (
                   <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="px-4 py-2 text-slate-500">{a.code ?? '—'}</td>
-                    <td className="px-4 py-2 font-medium text-ink-900">{a.name}</td>
+                    <td className="px-4 py-2 font-medium text-ink-900">
+                      {a.name}
+                      {a.bankAccount && (
+                        <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-normal text-emerald-700">
+                          Deposit account
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-slate-500">{a.subtype ?? '—'}</td>
                     <td className="px-4 py-2 text-slate-500">{a.isActive ? 'Active' : 'Inactive'}</td>
                     {canEdit && (
                       <td className="px-4 py-2 text-right">
-                        <QuickEditButton
-                          title={`Edit ${a.name}`}
-                          apiUrl={`/api/accounts/${a.id}`}
-                          initialValues={{
-                            code: a.code ?? '',
-                            name: a.name,
-                            subtype: a.subtype ?? '',
-                            description: a.description ?? '',
-                            isActive: a.isActive,
-                          }}
-                          fields={[
-                            { key: 'code', label: 'Account Code' },
-                            { key: 'name', label: 'Name', required: true },
-                            { key: 'subtype', label: 'Subtype' },
-                            { key: 'description', label: 'Description', type: 'textarea' },
-                            { key: 'isActive', label: 'Active', type: 'checkbox' },
-                          ]}
-                        />
+                        <div className="flex items-center justify-end gap-2">
+                          {a.type === 'ASSET' && !a.bankAccount && (
+                            <QuickAddButton
+                              label="Enable for Deposits"
+                              title={`Enable "${a.name}" for deposits`}
+                              apiUrl={`/api/accounts/${a.id}/bank-account`}
+                              buttonClassName="btn-secondary text-xs"
+                              fields={[
+                                {
+                                  key: 'accountType',
+                                  label: 'Account Type',
+                                  type: 'select',
+                                  options: [
+                                    { value: 'CHECKING', label: 'Checking' },
+                                    { value: 'SAVINGS', label: 'Savings' },
+                                    { value: 'CREDIT_CARD', label: 'Credit Card' },
+                                  ],
+                                  defaultValue: 'CHECKING',
+                                },
+                                { key: 'accountNumberMasked', label: 'Account Number (optional)' },
+                                {
+                                  key: 'openingBalance',
+                                  label: 'Opening Balance',
+                                  type: 'number',
+                                  step: '0.01',
+                                  defaultValue: 0,
+                                },
+                                { key: 'currencyCode', label: 'Currency', defaultValue: currencyCode },
+                              ]}
+                            />
+                          )}
+                          <QuickEditButton
+                            title={`Edit ${a.name}`}
+                            apiUrl={`/api/accounts/${a.id}`}
+                            initialValues={{
+                              code: a.code ?? '',
+                              name: a.name,
+                              subtype: a.subtype ?? '',
+                              description: a.description ?? '',
+                              isActive: a.isActive,
+                            }}
+                            fields={[
+                              { key: 'code', label: 'Account Code' },
+                              { key: 'name', label: 'Name', required: true },
+                              { key: 'subtype', label: 'Subtype' },
+                              { key: 'description', label: 'Description', type: 'textarea' },
+                              { key: 'isActive', label: 'Active', type: 'checkbox' },
+                            ]}
+                          />
+                        </div>
                       </td>
                     )}
                   </tr>
