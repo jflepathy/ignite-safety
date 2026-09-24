@@ -1047,7 +1047,9 @@ sending is not set up yet" rather than a confusing error, confirmed live
 expected 503, invoice status and audit log both unchanged — no partial
 side effects, no real send attempted). Once the key is in hand: `wrangler
 secret put RESEND_API_KEY` / `RESEND_FROM_EMAIL`, then a real end-to-end
-send needs to be live-verified before calling this done.
+send needs to be live-verified before calling this done. `tsc`/build
+clean. Deployed: version id `eb361b63-fa6d-4b35-b01a-841cfeb27cad`.
+Pushed: commit `75f9e8c`.
 
 *Bank statement / reconciliation — blocked on a decision, not yet built.*
 The user uploaded a real MCB statement (password-protected PDF, decrypted
@@ -1135,16 +1137,16 @@ project**, once the Session 7 backlog was clear — treat it as still
 pending user go-ahead, not silently in scope for the next session.
 
 ## Deployment path
-**Live as of Session 6 (2026-09-20/21), updated through Session 22 round 10
+**Live as of Session 6 (2026-09-20/21), updated through Session 22 round 11
 (2026-09-24): Cloudflare Workers (via OpenNext) + Neon (pooled + direct
 Postgres connections, `PrismaNeonHTTP` driver adapter), at its permanent
 domain.** Worker name `ignite-safety`, current version id
-`e47c2e40-4fae-482d-89eb-bd38fe0b2454`. Canonical public URL:
+`eb361b63-fa6d-4b35-b01a-841cfeb27cad`. Canonical public URL:
 **`https://app.ignitesafety.shop`** (DNS cutover complete and verified,
 see Session 6 above); `https://ignite-safety.ignite-safety.workers.dev`
 still works as a fallback. Source pushed to
 `github.com/jflepathy/ignite-safety` (`main`, currently at commit
-`4195a2c`). The originally-planned Supabase+Vercel path (see Session 1–5
+`75f9e8c`). The originally-planned Supabase+Vercel path (see Session 1–5
 notes) was superseded by this Cloudflare+Neon path per the user's own
 cost/longevity comparison in Session 6 — README.md in the repo still
 describes the old path and should be treated as superseded by this doc
