@@ -8,7 +8,7 @@ import PrintButton from '@/components/print-button';
 import PrintOnLoad from '@/components/shared/print-on-load';
 import ShareLinkButton from '@/components/shared/share-link-button';
 import AttachmentsPanel from '@/components/shared/attachments-panel';
-import InvoiceDocument from '@/components/billing/invoice-document';
+import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/invoice-document';
 import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
@@ -39,6 +39,55 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
 
   const currency = settings?.currencyCode ?? 'SCR';
   const allowedMethods = (settings?.allowedPaymentMethods as string[]) ?? ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'];
+
+  // Built once and handed to both InvoiceDocument (screen/print) and
+  // DownloadPdfButton (the real text-based PDF) so the two can never
+  // drift apart on the underlying data — see InvoiceDocumentData's own
+  // comment in invoice-document.tsx.
+  const documentData: InvoiceDocumentData = {
+    settings: {
+      companyName: settings?.companyName ?? 'Ignite Safety',
+      companyAddress: settings?.companyAddress ?? null,
+      companyPhone: settings?.companyPhone ?? null,
+      companyEmail: settings?.companyEmail ?? null,
+      taxRegistrationNumber: settings?.taxRegistrationNumber ?? null,
+      logoUrl: settings?.logoUrl ?? null,
+      paymentInstructions: settings?.paymentInstructions ?? null,
+      bankName: settings?.bankName ?? null,
+      bankAccountName: settings?.bankAccountName ?? null,
+      bankAccountNumber: settings?.bankAccountNumber ?? null,
+    },
+    documentNumber: invoice.invoiceNumber,
+    issueDate: invoice.issueDate.toLocaleDateString(),
+    dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null,
+    poNumber: invoice.poNumber,
+    terms: invoice.terms,
+    customer: {
+      displayName: invoice.customer.displayName,
+      address: invoice.customer.address,
+      phone: invoice.customer.phone,
+    },
+    lineItems: invoice.lineItems.map((li) => ({
+      id: li.id,
+      sku: li.shopItem?.sku ?? null,
+      description: li.description,
+      quantity: li.quantity.toString(),
+      unitPrice: li.unitPrice.toString(),
+      discountPercent: li.discountPercent.toString(),
+      taxName: li.taxRate?.name ?? null,
+      lineTotal: li.lineTotal.toString(),
+    })),
+    currency,
+    subtotal: invoice.subtotal.toString(),
+    discountTotal: invoice.discountTotal.toString(),
+    globalDiscountPercent: invoice.globalDiscountPercent.toString(),
+    taxTotal: invoice.taxTotal.toString(),
+    total: invoice.total.toString(),
+    amountPaid: invoice.amountPaid.toString(),
+    balanceDue: invoice.balanceDue.toString(),
+    taxInclusive: invoice.taxInclusive,
+    customerMessage: invoice.customerMessage,
+  };
 
   return (
     <div className="space-y-6">
@@ -73,7 +122,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             <MarkAsSentButton invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
           )}
           <PrintButton />
-          <DownloadPdfButton targetId="pdf-document" fileName={invoice.invoiceNumber} />
+          <DownloadPdfButton document={documentData} fileName={invoice.invoiceNumber} />
           <RecordPaymentForm
             invoiceId={invoice.id}
             balanceDue={Number(invoice.balanceDue)}
@@ -86,50 +135,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
 
       <div className="print-area">
        <PrintCopies copies={1} id="pdf-document">
-        <InvoiceDocument
-          settings={{
-            companyName: settings?.companyName ?? 'Ignite Safety',
-            companyAddress: settings?.companyAddress ?? null,
-            companyPhone: settings?.companyPhone ?? null,
-            companyEmail: settings?.companyEmail ?? null,
-            taxRegistrationNumber: settings?.taxRegistrationNumber ?? null,
-            logoUrl: settings?.logoUrl ?? null,
-            paymentInstructions: settings?.paymentInstructions ?? null,
-            bankName: settings?.bankName ?? null,
-            bankAccountName: settings?.bankAccountName ?? null,
-            bankAccountNumber: settings?.bankAccountNumber ?? null,
-          }}
-          documentNumber={invoice.invoiceNumber}
-          issueDate={invoice.issueDate.toLocaleDateString()}
-          dueDate={invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null}
-          poNumber={invoice.poNumber}
-          terms={invoice.terms}
-          customer={{
-            displayName: invoice.customer.displayName,
-            address: invoice.customer.address,
-            phone: invoice.customer.phone,
-          }}
-          lineItems={invoice.lineItems.map((li) => ({
-            id: li.id,
-            sku: li.shopItem?.sku ?? null,
-            description: li.description,
-            quantity: li.quantity.toString(),
-            unitPrice: li.unitPrice.toString(),
-            discountPercent: li.discountPercent.toString(),
-            taxName: li.taxRate?.name ?? null,
-            lineTotal: li.lineTotal.toString(),
-          }))}
-          currency={currency}
-          subtotal={invoice.subtotal.toString()}
-          discountTotal={invoice.discountTotal.toString()}
-          globalDiscountPercent={invoice.globalDiscountPercent.toString()}
-          taxTotal={invoice.taxTotal.toString()}
-          total={invoice.total.toString()}
-          amountPaid={invoice.amountPaid.toString()}
-          balanceDue={invoice.balanceDue.toString()}
-          taxInclusive={invoice.taxInclusive}
-          customerMessage={invoice.customerMessage}
-        />
+        <InvoiceDocument {...documentData} />
        </PrintCopies>
       </div>
 

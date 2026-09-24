@@ -1,6 +1,6 @@
 import { formatMoney } from '@/lib/money';
 
-type LineItem = {
+export type LineItem = {
   id: string;
   sku: string | null;
   description: string;
@@ -11,7 +11,7 @@ type LineItem = {
   lineTotal: string;
 };
 
-type Settings = {
+export type Settings = {
   companyName: string;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -22,6 +22,38 @@ type Settings = {
   bankName: string | null;
   bankAccountName: string | null;
   bankAccountNumber: string | null;
+};
+
+/**
+ * The full data shape this document is built from. Exported so a page can
+ * build ONE object and hand it to both `InvoiceDocument` (the on-screen/
+ * print rendering) and `buildDocumentPdf` (the real, downloadable, text-
+ * based PDF — see src/lib/pdf/build-document-pdf.ts) — one data source feeding
+ * two renderers, so they can't silently drift apart the way the previous
+ * screenshot-based Download PDF button always risked (Session 22 round 7).
+ */
+export type InvoiceDocumentData = {
+  settings: Settings;
+  documentLabel?: string;
+  documentNumber: string;
+  issueDate: string;
+  dueDate?: string | null;
+  poNumber?: string | null;
+  terms?: string | null;
+  customer: { displayName: string; address: string | null; phone: string | null };
+  lineItems: LineItem[];
+  currency: string;
+  subtotal: string;
+  discountTotal: string;
+  globalDiscountPercent: string;
+  taxTotal: string;
+  total: string;
+  amountPaid?: string;
+  balanceDue: string;
+  taxInclusive?: boolean;
+  customerMessage?: string | null;
+  totalLabel?: string;
+  showTaxNote?: boolean;
 };
 
 /**
