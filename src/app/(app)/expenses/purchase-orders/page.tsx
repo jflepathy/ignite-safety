@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { canEditModule } from '@/lib/edit-permissions-constants';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 import { StatusBadge } from '@/components/status-badge';
 import QuickEditButton from '@/components/shared/quick-edit-button';
 
@@ -51,8 +52,8 @@ export default async function PurchaseOrdersPage() {
               <tr key={o.id} className="border-b border-slate-50 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-ink-900">{o.poNumber}</td>
                 <td className="px-4 py-3 text-slate-500">{o.supplier.displayName}</td>
-                <td className="px-4 py-3 text-slate-500">{o.orderDate.toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-slate-500">{o.expectedDate ? o.expectedDate.toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(o.orderDate)}</td>
+                <td className="px-4 py-3 text-slate-500">{o.expectedDate ? formatDate(o.expectedDate) : '—'}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={o.status} />
                 </td>

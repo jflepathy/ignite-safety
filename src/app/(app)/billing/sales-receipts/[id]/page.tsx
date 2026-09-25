@@ -6,6 +6,7 @@ import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/invoice-document';
 import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
+import { formatDate } from '@/lib/format-date';
 
 export default async function SalesReceiptDetailPage({ params }: { params: { id: string } }) {
   const [receipt, settings] = await Promise.all([
@@ -33,7 +34,7 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
     },
     documentLabel: 'Sales Receipt',
     documentNumber: receipt.receiptNumber,
-    issueDate: receipt.saleDate.toLocaleDateString(),
+    issueDate: formatDate(receipt.saleDate),
     customer: {
       displayName: receipt.customer.displayName,
       address: receipt.customer.address,

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { canEditModule } from '@/lib/edit-permissions-constants';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 import { StatusBadge } from '@/components/status-badge';
 import PayBillButton from '@/components/expenses/pay-bill-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
@@ -59,8 +60,8 @@ export default async function BillsPage() {
               <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-ink-900">{b.billNumber}</td>
                 <td className="px-4 py-3 text-slate-500">{b.supplier.displayName}</td>
-                <td className="px-4 py-3 text-slate-500">{b.billDate.toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-slate-500">{b.dueDate ? b.dueDate.toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(b.billDate)}</td>
+                <td className="px-4 py-3 text-slate-500">{b.dueDate ? formatDate(b.dueDate) : '—'}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={b.status} />
                 </td>

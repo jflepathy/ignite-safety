@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
+import { formatDate } from '@/lib/format-date';
 
 export default async function CreditNotesPage() {
   const [notes, settings] = await Promise.all([
@@ -43,7 +44,7 @@ export default async function CreditNotesPage() {
                 <td className="px-4 py-3">
                   <StatusBadge status={n.status} />
                 </td>
-                <td className="px-4 py-3 text-slate-500">{n.createdAt.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(n.createdAt)}</td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(n.total.toString(), currency)}</td>
               </tr>
             ))}

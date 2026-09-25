@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignaturePad from './signature-pad';
 import BillingBridgeModal from './billing-bridge-modal';
+import { formatDate } from '@/lib/format-date';
 
 type ServiceLine = { key: string; label: string; quantity: number; kind: 'STANDARD' | 'CUSTOM' | 'WORKSHOP' };
 
@@ -285,7 +286,7 @@ export default function PosClient({
           </div>
           <p className="truncate text-xs text-slate-500">
             {workOrder.locationDetails ?? 'No location set'} · {workOrder.contactPerson ?? '—'} {workOrder.phone ? `· ${workOrder.phone}` : ''} ·{' '}
-            {workOrder.scheduledDate ? new Date(workOrder.scheduledDate).toLocaleDateString() : 'Unscheduled'}
+            {workOrder.scheduledDate ? formatDate(workOrder.scheduledDate) : 'Unscheduled'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -351,7 +352,7 @@ export default function PosClient({
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 self-start text-sm sm:justify-self-end">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Date</span>
               <span className="text-right font-medium sm:text-left">
-                {workOrder.scheduledDate ? new Date(workOrder.scheduledDate).toLocaleDateString() : '—'}
+                {workOrder.scheduledDate ? formatDate(workOrder.scheduledDate) : '—'}
               </span>
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Location</span>
               <span className="text-right font-medium sm:text-left">{workOrder.locationDetails ?? '—'}</span>

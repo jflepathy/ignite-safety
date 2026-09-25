@@ -3,6 +3,7 @@ import { formatMoney } from '@/lib/money';
 import { differenceInCalendarDays } from 'date-fns';
 import PrintButton from '@/components/print-button';
 import ReportDateFilter from '@/components/reports/report-date-filter';
+import { formatDate } from '@/lib/format-date';
 
 export default async function ReportsPage({ searchParams }: { searchParams: { from?: string; to?: string } }) {
   const fromDate = searchParams?.from ? new Date(searchParams.from) : null;
@@ -56,7 +57,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
 
   const rangeLabel =
     fromDate || toDate
-      ? `${searchParams.from ? new Date(searchParams.from).toLocaleDateString() : 'the start'} – ${searchParams.to ? new Date(searchParams.to).toLocaleDateString() : 'today'}`
+      ? `${searchParams.from ? formatDate(new Date(searchParams.from)) : 'the start'} – ${searchParams.to ? formatDate(new Date(searchParams.to)) : 'today'}`
       : 'All time';
 
   return (
@@ -65,7 +66,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
         <div>
           <h1 className="text-2xl font-semibold text-ink-900">Financial Reports</h1>
           <p className="text-sm text-slate-500">Accounts receivable, income vs. expense, and sales tax collection.</p>
-          <p className="mt-1 hidden text-xs text-slate-400 print:block">Period: {rangeLabel} — printed {new Date().toLocaleDateString()}</p>
+          <p className="mt-1 hidden text-xs text-slate-400 print:block">Period: {rangeLabel} — printed {formatDate(new Date())}</p>
         </div>
         <PrintButton />
       </div>

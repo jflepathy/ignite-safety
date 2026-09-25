@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 export default async function TransfersPage() {
   const [transfers, settings] = await Promise.all([
@@ -35,7 +36,7 @@ export default async function TransfersPage() {
           <tbody>
             {transfers.map((t) => (
               <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-500">{t.date.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(t.date)}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{t.fromAccount.name}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{t.toAccount.name}</td>
                 <td className="px-4 py-3 text-slate-500">{t.memo ?? '—'}</td>

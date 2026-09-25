@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/status-badge';
+import { formatDate } from '@/lib/format-date';
 
 // Work orders don't carry a background job that flips their status, so how
 // overdue a job is gets derived here at read time from its scheduled date,
@@ -84,7 +85,7 @@ export default async function WorkOrdersPage() {
                 <td className="px-4 py-3">{wo.customer.displayName}</td>
                 <td className="px-4 py-3">{wo.serviceType === 'ONSITE' ? 'Onsite' : 'Workshop'}</td>
                 <td className="px-4 py-3 text-slate-500">
-                  {wo.scheduledDate ? wo.scheduledDate.toLocaleDateString() : '—'}
+                  {wo.scheduledDate ? formatDate(wo.scheduledDate) : '—'}
                 </td>
                 <td className="px-4 py-3 text-slate-500">{wo.assignedTechnician?.name ?? 'Unassigned'}</td>
                 <td className="px-4 py-3">

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
 import { computeIncentiveForServiceLines, type ServiceLine } from '@/lib/incentives';
+import { formatDate } from '@/lib/format-date';
 
 function monthBounds(monthStr: string) {
   // monthStr: "YYYY-MM"
@@ -165,7 +166,7 @@ export default async function TechnicianIncentivePage({ searchParams }: { search
               <div>
                 <p className="font-medium text-ink-900">{j.woNumber}</p>
                 <p className="text-xs text-slate-400">
-                  Invoice {j.invoiceNumber} · {new Date(j.date).toLocaleDateString()}
+                  Invoice {j.invoiceNumber} · {formatDate(j.date)}
                   {j.splitWith && ` · split ${j.splitWith} ways`}
                 </p>
               </div>

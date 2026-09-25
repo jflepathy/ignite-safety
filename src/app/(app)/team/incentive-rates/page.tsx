@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
 import { computeIncentiveForServiceLines, type ServiceLine } from '@/lib/incentives';
 import { monthBounds, monthLabel, shiftMonth, currentMonthStr, isValidMonthStr } from '@/lib/month-range';
+import { formatDate } from '@/lib/format-date';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
 
@@ -222,7 +223,7 @@ export default async function IncentiveRatesPage({ searchParams }: { searchParam
                             {row.jobs.map((j, idx) => (
                               <div key={idx} className="flex items-center justify-between gap-4 border-t border-slate-50 pt-1 first:border-0 first:pt-0">
                                 <span>
-                                  {j.woNumber} · Invoice {j.invoiceNumber} · {new Date(j.date).toLocaleDateString()}
+                                  {j.woNumber} · Invoice {j.invoiceNumber} · {formatDate(j.date)}
                                   {j.headcount > 1 && ` · split ${j.headcount} ways`}
                                 </span>
                                 <span className="shrink-0 font-medium text-ink-900">{formatMoney(j.share, currency)}</span>

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { formatDate } from '@/lib/format-date';
 
 export default async function TimeTrackingPage() {
   const activities = await prisma.timeActivity.findMany({
@@ -47,7 +48,7 @@ export default async function TimeTrackingPage() {
           <tbody>
             {activities.map((a) => (
               <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-500">{a.date.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(a.date)}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{a.employee.name}</td>
                 <td className="px-4 py-3 text-slate-500">{a.serviceDescription ?? '—'}</td>
                 <td className="px-4 py-3 text-right">{Number(a.hours).toFixed(1)}</td>

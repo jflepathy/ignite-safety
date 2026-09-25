@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 // Lite reconciliation view: lists raw bank transactions and their
 // reconciled state. A full statement-import + auto-matching engine is a
@@ -45,7 +46,7 @@ export default async function ReconcilePage() {
             <tbody>
               {acc.transactions.map((t) => (
                 <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-500">{t.date.toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-slate-500">{formatDate(t.date)}</td>
                   <td className="px-4 py-2 text-ink-900">{t.description}</td>
                   <td className={`px-4 py-2 text-right font-medium ${Number(t.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                     {formatMoney(t.amount.toString(), currency)}

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 function toDateInput(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : '';
@@ -102,7 +103,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: { 
                 <td className="px-4 py-3 text-slate-500">{e.phone ?? e.email ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">
                   {e.employmentType ?? '—'}
-                  {e.contractEndDate && <span className="block text-xs text-slate-400">until {e.contractEndDate.toLocaleDateString()}</span>}
+                  {e.contractEndDate && <span className="block text-xs text-slate-400">until {formatDate(e.contractEndDate)}</span>}
                 </td>
                 <td className="px-4 py-3 text-right text-slate-500">{e.standardHoursPerWeek?.toString() ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.payType}</td>

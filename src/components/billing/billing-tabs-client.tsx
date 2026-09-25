@@ -110,6 +110,26 @@ export default function BillingTabsClient({
 
   const showTypeColumn = tab === 'all' || tab === 'documents';
 
+  // The "+ New ..." actions are scoped to whichever tab is actually showing
+  // (client-side `tab` state, not the server's `initialTab` prop, so the
+  // buttons update instantly on an in-page tab click, not just after a
+  // sidebar navigation) — Estimates only offers a new Estimate, Invoice &
+  // Sales Receipts offers both of *its* document types, Credit Notes offers
+  // a new Credit Note, and All/Overview offers every type since it isn't
+  // scoped to one.
+  const NEW_ESTIMATE = { href: '/billing/estimates/new', label: '+ New Estimate' };
+  const NEW_INVOICE = { href: '/billing/invoices/new', label: '+ New Invoice' };
+  const NEW_SALES_RECEIPT = { href: '/billing/sales-receipts/new', label: '+ New Sales Receipt' };
+  const NEW_CREDIT_NOTE = { href: '/billing/credit-notes/new', label: '+ New Credit Note' };
+  const newDocActions: { href: string; label: string }[] =
+    tab === 'estimates'
+      ? [NEW_ESTIMATE]
+      : tab === 'documents'
+        ? [NEW_INVOICE, NEW_SALES_RECEIPT]
+        : tab === 'credit-notes'
+          ? [NEW_CREDIT_NOTE]
+          : [NEW_ESTIMATE, NEW_INVOICE, NEW_SALES_RECEIPT, NEW_CREDIT_NOTE];
+
   return (
     <div className="card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 pt-3">
@@ -127,7 +147,7 @@ export default function BillingTabsClient({
             </button>
           ))}
         </div>
-        <div className="pb-2">
+        <div className="flex flex-wrap items-center gap-2 pb-2">
           <input
             type="search"
             value={query}
@@ -135,6 +155,13 @@ export default function BillingTabsClient({
             placeholder="Search by number or customer…"
             className="input w-56"
           />
+          <div className="flex flex-wrap gap-2">
+            {newDocActions.map((a, i) => (
+              <Link key={a.href} href={a.href} className={i === newDocActions.length - 1 ? 'btn-primary' : 'btn-secondary'}>
+                {a.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 

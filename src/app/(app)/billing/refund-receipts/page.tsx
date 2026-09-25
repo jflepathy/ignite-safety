@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 export default async function RefundReceiptsPage() {
   const [refunds, settings] = await Promise.all([
@@ -38,7 +39,7 @@ export default async function RefundReceiptsPage() {
               <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-ink-900">{r.refundNumber}</td>
                 <td className="px-4 py-3 text-slate-500">{r.customer.displayName}</td>
-                <td className="px-4 py-3 text-slate-500">{r.refundDate.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(r.refundDate)}</td>
                 <td className="px-4 py-3 text-slate-500">{r.method.replace('_', ' ')}</td>
                 <td className="px-4 py-3 text-slate-500">{r.reason ?? '—'}</td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(r.total.toString(), currency)}</td>

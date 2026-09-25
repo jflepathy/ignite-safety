@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/api-auth';
 import { sendEmail, EmailNotConfiguredError } from '@/lib/email';
 import { buildDocumentPdf } from '@/lib/pdf/build-document-pdf';
 import type { InvoiceDocumentData } from '@/components/billing/invoice-document';
+import { formatDate } from '@/lib/format-date';
 
 /**
  * Session 22, round 11 — "email & whatsapp delivery of invoice" (Tier 3).
@@ -55,8 +56,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       bankAccountNumber: settings?.bankAccountNumber ?? null,
     },
     documentNumber: invoice.invoiceNumber,
-    issueDate: invoice.issueDate.toLocaleDateString(),
-    dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null,
+    issueDate: formatDate(invoice.issueDate),
+    dueDate: invoice.dueDate ? formatDate(invoice.dueDate) : null,
     poNumber: invoice.poNumber,
     terms: invoice.terms,
     customer: {

@@ -9,6 +9,7 @@ import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/invoice-document';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
+import { formatDate } from '@/lib/format-date';
 
 export default async function EstimateDetailPage({ params }: { params: { id: string } }) {
   const [estimate, settings, session] = await Promise.all([
@@ -41,7 +42,7 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
     },
     documentLabel: 'Estimate',
     documentNumber: estimate.estimateNumber,
-    issueDate: estimate.issueDate.toLocaleDateString(),
+    issueDate: formatDate(estimate.issueDate),
     customer: {
       displayName: estimate.customer.displayName,
       address: estimate.customer.address,
@@ -80,7 +81,7 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
             <StatusBadge status={estimate.status} />
             <span className="text-sm text-slate-500">{estimate.customer.displayName}</span>
             {estimate.expiryDate && (
-              <span className="text-xs text-slate-400">Valid until {estimate.expiryDate.toLocaleDateString()}</span>
+              <span className="text-xs text-slate-400">Valid until {formatDate(estimate.expiryDate)}</span>
             )}
           </div>
         </div>

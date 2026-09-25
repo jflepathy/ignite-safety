@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { formatDateTime } from '@/lib/format-date';
 
 export default async function AuditLogPage() {
   const logs = await prisma.auditLog.findMany({
@@ -27,7 +28,7 @@ export default async function AuditLogPage() {
           <tbody>
             {logs.map((l) => (
               <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-500">{l.createdAt.toLocaleString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDateTime(l.createdAt)}</td>
                 <td className="px-4 py-3 text-ink-900">{l.user?.name ?? 'System'}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{l.action}</td>
                 <td className="px-4 py-3 text-slate-500">

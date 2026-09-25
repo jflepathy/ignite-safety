@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import BillingTabsClient from '@/components/billing/billing-tabs-client';
 import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
+import { formatDate } from '@/lib/format-date';
 
 export default async function BillingPage({
   searchParams,
@@ -80,14 +81,6 @@ export default async function BillingPage({
           <p className="text-sm text-slate-500">
             Manual invoicing, estimates & credit notes — nothing is ever sent automatically.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/billing/estimates/new" className="btn-secondary">
-            + New Estimate
-          </Link>
-          <Link href="/billing/invoices/new" className="btn-primary">
-            + New Invoice
-          </Link>
         </div>
       </div>
 
@@ -175,7 +168,7 @@ export default async function BillingPage({
             number: inv.invoiceNumber,
             href: `/billing/invoices/${inv.id}`,
             customerName: inv.customer.displayName,
-            date: inv.issueDate.toLocaleDateString(),
+            date: formatDate(inv.issueDate),
             dateSort: inv.issueDate.toISOString(),
             total: inv.total.toString(),
             balanceDue: inv.balanceDue.toString(),
@@ -187,7 +180,7 @@ export default async function BillingPage({
             number: r.receiptNumber,
             href: `/billing/sales-receipts/${r.id}`,
             customerName: r.customer.displayName,
-            date: r.saleDate.toLocaleDateString(),
+            date: formatDate(r.saleDate),
             dateSort: r.saleDate.toISOString(),
             total: r.total.toString(),
             balanceDue: null,
@@ -199,7 +192,7 @@ export default async function BillingPage({
             number: es.estimateNumber,
             href: `/billing/estimates/${es.id}`,
             customerName: es.customer.displayName,
-            date: es.issueDate.toLocaleDateString(),
+            date: formatDate(es.issueDate),
             dateSort: es.issueDate.toISOString(),
             total: es.total.toString(),
             balanceDue: null,
@@ -214,7 +207,7 @@ export default async function BillingPage({
             // matching how the old Credit Notes tab always rendered it.
             href: null,
             customerName: cn.customer.displayName,
-            date: cn.createdAt.toLocaleDateString(),
+            date: formatDate(cn.createdAt),
             dateSort: cn.createdAt.toISOString(),
             total: cn.total.toString(),
             balanceDue: null,

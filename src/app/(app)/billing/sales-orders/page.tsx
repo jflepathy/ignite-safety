@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { StatusBadge } from '@/components/status-badge';
+import { formatDate } from '@/lib/format-date';
 
 export default async function SalesOrdersPage() {
   const [orders, settings] = await Promise.all([
@@ -38,7 +39,7 @@ export default async function SalesOrdersPage() {
               <tr key={o.id} className="border-b border-slate-50 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-ink-900">{o.orderNumber}</td>
                 <td className="px-4 py-3 text-slate-500">{o.customer.displayName}</td>
-                <td className="px-4 py-3 text-slate-500">{o.orderDate.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(o.orderDate)}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={o.status} />
                 </td>

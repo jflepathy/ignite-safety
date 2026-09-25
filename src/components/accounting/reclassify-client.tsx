@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 type Account = { id: string; code: string | null; name: string; type: string };
 type Row = { id: string; date: string; description: string; vendor: string; reference: string; amount: string };
@@ -184,7 +185,7 @@ export default function ReclassifyClient({
                               onChange={() => toggle(selectedExpenseIds, setSelectedExpenseIds, r.id)}
                             />
                           </td>
-                          <td className="px-4 py-2 text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-2 text-slate-500">{formatDate(r.date)}</td>
                           <td className="px-4 py-2 text-slate-500">{r.reference}</td>
                           <td className="px-4 py-2 text-slate-500">{r.vendor}</td>
                           <td className="px-4 py-2 text-ink-900">{r.description}</td>
@@ -222,7 +223,7 @@ export default function ReclassifyClient({
                               onChange={() => toggle(selectedLineItemIds, setSelectedLineItemIds, r.id)}
                             />
                           </td>
-                          <td className="px-4 py-2 text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-2 text-slate-500">{formatDate(r.date)}</td>
                           <td className="px-4 py-2 text-slate-500">{r.reference}</td>
                           <td className="px-4 py-2 text-slate-500">{r.vendor}</td>
                           <td className="px-4 py-2 text-ink-900">{r.description}</td>

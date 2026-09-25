@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { StatusBadge } from '@/components/status-badge';
 import PrintButton from '@/components/print-button';
 import InvoiceDocument from '@/components/billing/invoice-document';
+import { formatDate } from '@/lib/format-date';
 
 // Public, unauthenticated view for a shared invoice link. Deliberately
 // excludes internal notes and lives outside the (app) route group so no
@@ -46,8 +47,8 @@ export default async function SharedInvoicePage({ params }: { params: { token: s
             bankAccountNumber: settings?.bankAccountNumber ?? null,
           }}
           documentNumber={invoice.invoiceNumber}
-          issueDate={invoice.issueDate.toLocaleDateString()}
-          dueDate={invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null}
+          issueDate={formatDate(invoice.issueDate)}
+          dueDate={invoice.dueDate ? formatDate(invoice.dueDate) : null}
           poNumber={invoice.poNumber}
           terms={invoice.terms}
           customer={{

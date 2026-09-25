@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { StatusBadge } from '@/components/status-badge';
 import ConvertToWorkOrderButton from '@/components/outreach/convert-button';
+import { formatDate } from '@/lib/format-date';
 
 export default async function ServiceRequestsPage() {
   const requests = await prisma.serviceRequest.findMany({
@@ -33,7 +34,7 @@ export default async function ServiceRequestsPage() {
                 <td className="px-4 py-3 font-medium">{r.requestNumber}</td>
                 <td className="px-4 py-3">{r.customer.displayName}</td>
                 <td className="px-4 py-3">{r.serviceType === 'ONSITE' ? 'Onsite' : 'Workshop'}</td>
-                <td className="px-4 py-3 text-slate-500">{r.proposedDate.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(r.proposedDate)}</td>
                 <td className="px-4 py-3 text-slate-500">{r.region ?? '—'}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={r.status} />

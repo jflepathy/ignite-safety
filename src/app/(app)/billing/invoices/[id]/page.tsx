@@ -18,6 +18,7 @@ import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
 import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
 import EmailInvoiceButton from '@/components/billing/email-invoice-button';
+import { formatDate } from '@/lib/format-date';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts, session] = await Promise.all([
@@ -65,8 +66,8 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
       bankAccountNumber: settings?.bankAccountNumber ?? null,
     },
     documentNumber: invoice.invoiceNumber,
-    issueDate: invoice.issueDate.toLocaleDateString(),
-    dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString() : null,
+    issueDate: formatDate(invoice.issueDate),
+    dueDate: invoice.dueDate ? formatDate(invoice.dueDate) : null,
     poNumber: invoice.poNumber,
     terms: invoice.terms,
     customer: {
@@ -196,7 +197,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
                 const proofPhotoUrl = (p as any).proofPhotoUrl as string | null;
                 return (
                   <tr key={p.id} className="border-t border-slate-100">
-                    <td className="py-2">{p.paidAt.toLocaleDateString()}</td>
+                    <td className="py-2">{formatDate(p.paidAt)}</td>
                     <td className="py-2">{p.method.replace('_', ' ')}</td>
                     <td className="py-2 text-slate-500">{(p as any).bankAccount?.name ?? '—'}</td>
                     <td className="py-2 text-slate-500">{p.reference ?? '—'}</td>

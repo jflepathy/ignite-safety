@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import OpportunityStageSelect from '@/components/customer-hub/opportunity-stage-select';
+import { formatDate } from '@/lib/format-date';
 
 const STAGES = ['PROSPECTING', 'QUALIFICATION', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
 
@@ -72,7 +73,7 @@ export default async function OpportunitiesPage() {
                 <td className="px-4 py-3 text-slate-500">{o.customer?.displayName ?? o.lead?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-right">{formatMoney(o.estimatedValue.toString(), currency)}</td>
                 <td className="px-4 py-3 text-right">{o.probabilityPercent}%</td>
-                <td className="px-4 py-3 text-slate-500">{o.expectedCloseDate ? o.expectedCloseDate.toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-3 text-slate-500">{o.expectedCloseDate ? formatDate(o.expectedCloseDate) : '—'}</td>
                 <td className="px-4 py-3">
                   <OpportunityStageSelect opportunityId={o.id} stage={o.stage} options={STAGES} />
                 </td>

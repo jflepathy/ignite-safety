@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatDateTime } from '@/lib/format-date';
 
 type Settings = {
   multiCurrencyEnabled: boolean;
@@ -198,7 +199,7 @@ export default function MultiCurrencyForm({ settings }: { settings: Settings }) 
             <div>
               <h2 className="text-sm font-semibold text-ink-900">Exchange Rates (per {form.baseCurrency})</h2>
               <p className="text-xs text-slate-500">
-                {lastFetched ? `Last auto-refreshed: ${new Date(lastFetched).toLocaleString()}` : 'Never auto-refreshed yet.'}
+                {lastFetched ? `Last auto-refreshed: ${formatDateTime(lastFetched)}` : 'Never auto-refreshed yet.'}
               </p>
             </div>
             <button className="btn-secondary" disabled={refreshing} onClick={refreshNow}>

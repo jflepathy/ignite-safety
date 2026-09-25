@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 
 export default async function JournalEntriesPage() {
   const [entries, settings] = await Promise.all([
@@ -30,7 +31,7 @@ export default async function JournalEntriesPage() {
                 <div>
                   <p className="font-medium text-ink-900">{e.entryNumber}</p>
                   <p className="text-xs text-slate-500">
-                    {e.date.toLocaleDateString()} {e.memo ? `— ${e.memo}` : ''}
+                    {formatDate(e.date)} {e.memo ? `— ${e.memo}` : ''}
                   </p>
                 </div>
                 <p className="text-sm font-medium text-ink-900">{formatMoney(total, currency)}</p>

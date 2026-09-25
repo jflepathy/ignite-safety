@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { StatusBadge } from '@/components/status-badge';
 import AssignTechnicianForm from '@/components/work-orders/assign-technician-form';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
+import { formatDate, formatDateTime } from '@/lib/format-date';
 
 export default async function WorkOrderDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -68,7 +69,7 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
           </p>
           <p className="text-sm text-slate-600">
             <span className="font-medium">Scheduled:</span>{' '}
-            {wo.scheduledDate ? wo.scheduledDate.toLocaleDateString() : '—'}
+            {wo.scheduledDate ? formatDate(wo.scheduledDate) : '—'}
           </p>
           <p className="text-sm text-slate-600">
             <span className="font-medium">Region:</span> {wo.region ?? '—'}
@@ -193,7 +194,7 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
                   <p className="mt-1 text-slate-600">{h.detail ?? '—'}</p>
                 </div>
                 <span className="shrink-0 whitespace-nowrap text-xs text-slate-400">
-                  {new Date(h.createdAt).toLocaleString()}
+                  {formatDateTime(new Date(h.createdAt))}
                 </span>
               </div>
             ))}

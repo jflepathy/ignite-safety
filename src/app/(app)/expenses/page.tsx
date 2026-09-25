@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { canEditModule } from '@/lib/edit-permissions-constants';
 import { formatMoney } from '@/lib/money';
+import { formatDate } from '@/lib/format-date';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
 import DownloadExpensePdfButton from '@/components/expenses/download-expense-pdf-button';
@@ -82,7 +83,7 @@ export default async function ExpensesPage() {
             {expenses.map((e) => (
               <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50">
                 <td className="px-4 py-3 font-mono text-xs text-slate-500">{e.expenseNumber ?? '—'}</td>
-                <td className="px-4 py-3 text-slate-500">{e.date.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(e.date)}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{e.account?.name ?? e.category}</td>
                 <td className="px-4 py-3 text-slate-500">{e.supplier?.displayName ?? e.vendor ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.description ?? '—'}</td>
@@ -93,7 +94,7 @@ export default async function ExpensesPage() {
                     <DownloadExpensePdfButton
                       expenseNumber={e.expenseNumber}
                       companyName={settings?.companyName ?? 'Ignite Safety'}
-                      date={e.date.toLocaleDateString()}
+                      date={formatDate(e.date)}
                       account={e.account?.name ?? e.category}
                       vendor={e.supplier?.displayName ?? e.vendor ?? ''}
                       description={e.description ?? ''}

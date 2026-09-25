@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/status-badge';
 import NewJobButton from '@/components/technician/new-job-button';
 import ClaimJobButton from '@/components/technician/claim-job-button';
 import { isStaleAssignment, STALE_ASSIGNMENT_DAYS } from '@/lib/work-order-status';
+import { formatDate } from '@/lib/format-date';
 
 export default async function TechnicianHomePage() {
   const session = await getServerSession(authOptions);
@@ -107,7 +108,7 @@ function JobCard({ wo, technicianId }: { wo: any; technicianId: string | null })
             ` · 👥 +${wo.additionalTechnicians.length} teammate${wo.additionalTechnicians.length === 1 ? '' : 's'}`}
         </p>
         {wo.scheduledDate && (
-          <p className="mt-1 text-xs text-slate-400">{new Date(wo.scheduledDate).toLocaleDateString()}</p>
+          <p className="mt-1 text-xs text-slate-400">{formatDate(wo.scheduledDate)}</p>
         )}
       </Link>
       {claimable && (

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { formatDate } from '@/lib/format-date';
 
 export default async function InventoryAdjustmentsPage() {
   const adjustments = await prisma.inventoryAdjustment.findMany({
@@ -34,7 +35,7 @@ export default async function InventoryAdjustmentsPage() {
           <tbody>
             {adjustments.map((a) => (
               <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-500">{a.date.toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(a.date)}</td>
                 <td className="px-4 py-3 font-medium text-ink-900">{a.shopItem.name}</td>
                 <td className={`px-4 py-3 text-right font-medium ${a.quantityChange < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                   {a.quantityChange > 0 ? `+${a.quantityChange}` : a.quantityChange}

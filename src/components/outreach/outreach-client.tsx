@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NewServiceRequestWizard from './new-service-request-wizard';
 import { EQUIPMENT_CATEGORIES } from '@/lib/equipment-categories';
+import { formatDate } from '@/lib/format-date';
 
 type Customer = {
   id: string;
@@ -234,7 +235,7 @@ export default function OutreachClient({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-slate-600">{new Date(c.soonestDueDate).toLocaleDateString()}</div>
+                  <div className="text-slate-600">{formatDate(c.soonestDueDate)}</div>
                   {c.overdue ? (
                     <span className="badge bg-red-100 text-red-700">
                       Overdue {Math.abs(c.soonestDaysUntilDue)}d{c.overdueCount > 1 ? ` (${c.overdueCount} items)` : ''}
@@ -290,7 +291,7 @@ export default function OutreachClient({
                   <td className="px-4 py-3 font-medium text-ink-900">{r.requestNumber}</td>
                   <td className="px-4 py-3 text-slate-500">{r.customerName}</td>
                   <td className="px-4 py-3 text-slate-500">{r.serviceType}</td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(r.proposedDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-slate-500">{formatDate(r.proposedDate)}</td>
                   <td className="px-4 py-3 text-slate-500">
                     {r.region ?? '—'} {r.district && `/ ${r.district}`}
                   </td>

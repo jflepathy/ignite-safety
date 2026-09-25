@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { formatMoney } from '@/lib/money';
+import { formatDateTime } from '@/lib/format-date';
 import RestoreButton from '@/components/admin/restore-button';
 
 // Session 22, round 10 — admin-only Recycle Bin (route-gated by
@@ -137,7 +138,7 @@ export default async function RecycleBinPage() {
                     <td className="px-4 py-2 font-medium text-ink-900">{r.cells[0]}</td>
                     <td className="px-4 py-2 text-slate-500">{r.cells[1]}</td>
                     <td className="px-4 py-2 text-slate-500">{r.cells[2]}</td>
-                    <td className="px-4 py-2 text-slate-500">{r.deletedAt.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-slate-500">{formatDateTime(r.deletedAt)}</td>
                     <td className="px-4 py-2 text-right">
                       <RestoreButton type={s.type} id={r.id} label={String(r.cells[0])} />
                     </td>
