@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
+import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
 
 export async function GET(req: NextRequest) {
@@ -192,6 +193,17 @@ export async function POST(req: NextRequest) {
       },
     });
   }
+
+  // Any line item that's a tagged piece of trackable safety equipment
+  // (fire extinguisher, blanket, hose reel, smoke/heat detector — see
+  // ShopItem.equipmentCategory) becomes a new Equipment record for the
+  // customer, due for its first servicing ~1 year out so it shows up on
+  // the Outreach "Due Soon" radar (Session 22, round 14).
+  await createEquipmentForSoldLines({
+    customerId: data.customerId,
+    saleDate: createdInvoice.issueDate,
+    lines: data.lineItems,
+  });
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: createdInvoice.id },

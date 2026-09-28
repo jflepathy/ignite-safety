@@ -6,6 +6,7 @@ import { canTechnicianAccess } from '@/lib/work-order-status';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { buildDraftInvoiceLines, type ServiceLine } from '@/lib/incentives';
+import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 
 // The technician billing-bridge's "Raise Invoice" / "Receiving Payment"
 // entry point (Session 16). Builds a DRAFT invoice straight from the
@@ -127,6 +128,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
   }
+
+  // A field-raised invoice is just as much a real sale as an office one —
+  // any sold fire extinguisher/blanket/hose reel/smoke or heat detector on
+  // this Work Order's service lines becomes a new Equipment record at the
+  // customer's site (Session 22, round 14).
+  await createEquipmentForSoldLines({
+    customerId: wo.customerId,
+    siteId: wo.siteId,
+    saleDate: issueDate,
+    lines: builtLines.map((l) => ({ shopItemId: l.shopItemId, quantity: l.quantity })),
+  });
 
   await prisma.auditLog.create({
     data: {

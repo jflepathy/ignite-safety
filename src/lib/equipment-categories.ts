@@ -5,6 +5,7 @@ export const EQUIPMENT_CATEGORIES = [
   { value: 'FIRE_BLANKET', label: 'Fire Blankets' },
   { value: 'LIFE_RAFT', label: 'Life Rafts' },
   { value: 'SMOKE_DETECTOR', label: 'Smoke Detectors' },
+  { value: 'HEAT_DETECTOR', label: 'Heat Detectors' },
   { value: 'EMERGENCY_LIGHT', label: 'Emergency Lights' },
   { value: 'FIRE_ALARM_PANEL', label: 'Fire Alarm Panels' },
   { value: 'OTHER', label: 'Other' },

@@ -23,6 +23,23 @@ const CreateSchema = z.object({
   reorderPoint: z.number().int().optional(),
   incomeAccountId: z.string().optional(),
   expenseAccountId: z.string().optional(),
+  // Marks this SKU as a piece of trackable safety equipment — see the
+  // ShopItem.equipmentCategory comment in schema.prisma.
+  equipmentCategory: z
+    .enum([
+      'FIRE_EXTINGUISHER',
+      'HOSE_REEL',
+      'SUPPRESSION_SYSTEM',
+      'FIRE_BLANKET',
+      'LIFE_RAFT',
+      'SMOKE_DETECTOR',
+      'HEAT_DETECTOR',
+      'EMERGENCY_LIGHT',
+      'FIRE_ALARM_PANEL',
+      'OTHER',
+    ])
+    .optional()
+    .nullable(),
 });
 
 export async function POST(req: NextRequest) {

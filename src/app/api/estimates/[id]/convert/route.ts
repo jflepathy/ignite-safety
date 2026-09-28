@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
+import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 
 // Converts an accepted Estimate/Quote into a DRAFT Invoice with identical
 // line items, preserving the QuickBooks-style "manual" billing flow: the
@@ -60,6 +61,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   await prisma.estimate.update({ where: { id: params.id }, data: { status: 'CONVERTED' } });
+
+  // An accepted estimate becoming an invoice is a real sale too — see the
+  // matching note in api/invoices/route.ts (Session 22, round 14).
+  await createEquipmentForSoldLines({
+    customerId: estimate.customerId,
+    saleDate: createdInvoice.issueDate,
+    lines: estimate.lineItems.map((li) => ({ shopItemId: li.shopItemId, quantity: Number(li.quantity) })),
+  });
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: createdInvoice.id },

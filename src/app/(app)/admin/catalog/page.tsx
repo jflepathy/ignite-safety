@@ -33,6 +33,7 @@ export default async function CatalogPage() {
           reorderPoint: i.reorderPoint,
           taxable: i.taxable,
           active: i.active,
+          equipmentCategory: i.equipmentCategory,
         }))}
         currency={settings?.currencyCode ?? 'SCR'}
         canEdit={canEdit}

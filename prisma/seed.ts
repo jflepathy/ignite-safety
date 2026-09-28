@@ -97,9 +97,13 @@ async function main() {
     { category: 'FIRE_EXTINGUISHER', label: 'Fire Extinguisher', months: 12, hydro: true },
     { category: 'HOSE_REEL', label: 'Hose Reel', months: 12, hydro: false },
     { category: 'SUPPRESSION_SYSTEM', label: 'Suppression System', months: 12, hydro: false },
-    { category: 'FIRE_BLANKET', label: 'Fire Blanket', months: 24, hydro: false },
+    // Session 22 round 14: changed from 24 to 12 months so every piece of
+    // equipment on the outreach radar (extinguisher/blanket/hose reel/
+    // smoke+heat detector) shares the same 1-year sticker validity.
+    { category: 'FIRE_BLANKET', label: 'Fire Blanket', months: 12, hydro: false },
     { category: 'LIFE_RAFT', label: 'Life Raft', months: 12, hydro: false },
     { category: 'SMOKE_DETECTOR', label: 'Smoke Detector', months: 12, hydro: false },
+    { category: 'HEAT_DETECTOR', label: 'Heat Detector', months: 12, hydro: false },
     { category: 'EMERGENCY_LIGHT', label: 'Emergency Light', months: 12, hydro: false },
     { category: 'FIRE_ALARM_PANEL', label: 'Fire Alarm Panel', months: 12, hydro: false },
   ];

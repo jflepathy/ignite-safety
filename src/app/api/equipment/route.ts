@@ -26,6 +26,7 @@ const CreateSchema = z.object({
     'FIRE_BLANKET',
     'LIFE_RAFT',
     'SMOKE_DETECTOR',
+    'HEAT_DETECTOR',
     'EMERGENCY_LIGHT',
     'FIRE_ALARM_PANEL',
     'OTHER',

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
+import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
 
 export async function GET() {
@@ -16,6 +17,13 @@ export async function GET() {
 }
 
 const LineSchema = z.object({
+  // Previously missing from this schema entirely — the New Sales Receipt
+  // form has always sent shopItemId per line (see simple-doc-form.tsx),
+  // but zod silently strips unrecognized keys, so no Sales Receipt line
+  // item was ever actually linked back to its catalog item. Fixed here
+  // (Session 22, round 14) as part of wiring up equipment-from-sale
+  // tracking, which needs this link to know what was sold.
+  shopItemId: z.string().optional().nullable(),
   description: z.string().min(1),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
@@ -80,6 +88,7 @@ export async function POST(req: NextRequest) {
     await prisma.salesReceiptLineItem.create({
       data: {
         salesReceiptId: createdReceipt.id,
+        shopItemId: li.shopItemId || null,
         description: li.description,
         quantity: li.quantity,
         unitPrice: li.unitPrice,
@@ -88,6 +97,16 @@ export async function POST(req: NextRequest) {
       },
     });
   }
+
+  // See the matching note in api/invoices/route.ts — a sold fire
+  // extinguisher/blanket/hose reel/smoke or heat detector becomes a new
+  // Equipment record so it's on the Outreach radar for next year's
+  // service (Session 22, round 14).
+  await createEquipmentForSoldLines({
+    customerId: data.customerId,
+    saleDate: createdReceipt.saleDate,
+    lines: data.lineItems,
+  });
 
   const receipt = await prisma.salesReceipt.findUnique({
     where: { id: createdReceipt.id },

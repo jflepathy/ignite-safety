@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QuickEditButton from '@/components/shared/quick-edit-button';
+import { EQUIPMENT_CATEGORIES } from '@/lib/equipment-categories';
 
 type Item = {
   id: string;
@@ -15,7 +16,16 @@ type Item = {
   reorderPoint: number | null;
   taxable: boolean;
   active: boolean;
+  // Set when this SKU is itself a trackable piece of safety equipment
+  // (fire extinguisher, blanket, hose reel, smoke/heat detector, …) —
+  // selling it creates an Equipment record for the customer so it lands
+  // on the Outreach "Due Soon" radar ~1 year out (Session 22, round 14).
+  equipmentCategory: string | null;
 };
+
+const EQUIPMENT_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
+  EQUIPMENT_CATEGORIES.map((c) => [c.value, c.label])
+);
 
 const TYPE_LABELS: Record<Item['itemType'], string> = {
   INVENTORY: 'Inventory (tracked)',
@@ -36,6 +46,7 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
     quantityOnHand: 0,
     reorderPoint: 0,
     taxable: true,
+    equipmentCategory: '',
   });
   const [saving, setSaving] = useState(false);
   const [generatingSku, setGeneratingSku] = useState(false);
@@ -78,12 +89,13 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
           ...form,
           quantityOnHand: form.itemType === 'INVENTORY' ? form.quantityOnHand : undefined,
           reorderPoint: form.itemType === 'INVENTORY' ? form.reorderPoint : undefined,
+          equipmentCategory: form.equipmentCategory || undefined,
         }),
       });
       if (res.ok) {
         const item = await res.json();
         setList((prev) => [...prev, { ...item, unitPrice: item.unitPrice.toString() }]);
-        setForm({ sku: '', name: '', category: '', itemType: 'SERVICE', unitPrice: 0, quantityOnHand: 0, reorderPoint: 0, taxable: true });
+        setForm({ sku: '', name: '', category: '', itemType: 'SERVICE', unitPrice: 0, quantityOnHand: 0, reorderPoint: 0, taxable: true, equipmentCategory: '' });
       }
     } finally {
       setSaving(false);
@@ -163,6 +175,7 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
             <th className="py-2">Name</th>
             <th className="py-2">Type</th>
             <th className="py-2">Category</th>
+            <th className="py-2">Tracked Equipment</th>
             <th className="py-2 text-right">Unit Price</th>
             <th className="py-2 text-right">Qty on Hand</th>
             <th className="py-2">Taxable</th>
@@ -177,6 +190,15 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
               <td className="py-2">{item.name}</td>
               <td className="py-2 text-slate-500">{TYPE_LABELS[item.itemType]}</td>
               <td className="py-2 text-slate-500">{item.category ?? '—'}</td>
+              <td className="py-2">
+                {item.equipmentCategory ? (
+                  <span className="badge bg-amber-50 text-amber-700">
+                    {EQUIPMENT_CATEGORY_LABEL[item.equipmentCategory] ?? item.equipmentCategory}
+                  </span>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </td>
               <td className="py-2 text-right">
                 {item.unitPrice} {currency}
               </td>
@@ -209,6 +231,7 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
                       taxable: item.taxable,
                       quantityOnHand: item.quantityOnHand ?? 0,
                       reorderPoint: item.reorderPoint ?? 0,
+                      equipmentCategory: item.equipmentCategory ?? '',
                     }}
                     fields={[
                       { key: 'name', label: 'Name', required: true },
@@ -221,6 +244,12 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
                             { key: 'reorderPoint', label: 'Reorder Point', type: 'number' },
                           ] as const)
                         : []),
+                      {
+                        key: 'equipmentCategory',
+                        label: 'Tracked Equipment (selling this creates next year’s outreach)',
+                        type: 'select',
+                        options: [{ value: '', label: '— Not tracked —' }, ...EQUIPMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))],
+                      },
                     ]}
                     onSaved={(updated) =>
                       setList((prev) => prev.map((x) => (x.id === item.id ? { ...x, ...updated, unitPrice: updated.unitPrice?.toString() ?? x.unitPrice } : x)))
@@ -272,6 +301,21 @@ export default function ShopItemsManager({ items, currency, canEdit }: { items: 
               value={form.unitPrice}
               onChange={(e) => setForm({ ...form, unitPrice: parseFloat(e.target.value) || 0 })}
             />
+          </div>
+          <div>
+            <label className="label">Tracked Equipment</label>
+            <select
+              className="input"
+              value={form.equipmentCategory}
+              onChange={(e) => setForm({ ...form, equipmentCategory: e.target.value })}
+            >
+              <option value="">— Not tracked —</option>
+              {EQUIPMENT_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </div>
           {form.itemType === 'INVENTORY' && (
             <>
