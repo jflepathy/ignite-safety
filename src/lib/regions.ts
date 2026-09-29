@@ -6,6 +6,7 @@ export const REGION_DISTRICTS: Record<string, string[]> = {
     'Au Cap',
     'Baie Lazare',
     'Baie Sainte Anne',
+    'Beau Vallon',
     'Bel Air',
     'Bel Ombre',
     'Cascade',
