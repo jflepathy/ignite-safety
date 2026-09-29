@@ -9,6 +9,7 @@ import PrintOnLoad from '@/components/shared/print-on-load';
 import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/invoice-document';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
+import ConvertEstimateButtons from '@/components/billing/convert-estimate-buttons';
 import { formatDate } from '@/lib/format-date';
 
 export default async function EstimateDetailPage({ params }: { params: { id: string } }) {
@@ -25,6 +26,7 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
   ]);
   if (!estimate) notFound();
   const isAdmin = session?.user.role === 'ADMIN';
+  const canConvert = session?.user.role === 'ADMIN' || session?.user.role === 'SALES';
   const currency = settings?.currencyCode ?? 'SCR';
 
   const documentData: InvoiceDocumentData = {
@@ -89,11 +91,16 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           <Link href="/billing?tab=estimates" className="btn-secondary">
             ← Back
           </Link>
-          <Link href={`/billing/estimates/${estimate.id}/edit`} className="btn-secondary">
-            Edit
-          </Link>
+          {estimate.status !== 'CONVERTED' && (
+            <Link href={`/billing/estimates/${estimate.id}/edit`} className="btn-secondary">
+              Edit
+            </Link>
+          )}
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={estimate.estimateNumber} />
+          {canConvert && estimate.status !== 'CONVERTED' && (
+            <ConvertEstimateButtons estimateId={estimate.id} currency={currency} />
+          )}
           {isAdmin && (
             <DeleteRecordButton
               apiUrl={`/api/estimates/${estimate.id}`}

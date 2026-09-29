@@ -65,6 +65,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const existing = await prisma.estimate.findUnique({ where: { id: params.id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // Session 22, round 15 — a converted estimate already has a real
+  // invoice or sales receipt built from its numbers; editing it
+  // afterward would leave that document silently out of sync with the
+  // estimate it came from, with nothing on screen to explain the gap.
+  if (existing.status === 'CONVERTED') {
+    return NextResponse.json(
+      { error: 'This estimate has already been converted and can no longer be edited.' },
+      { status: 409 }
+    );
+  }
 
   let totalsPatch = {};
   if (data.lineItems) {
