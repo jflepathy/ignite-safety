@@ -4,6 +4,17 @@
   "name": "ignite-safety",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // Session 22, round 17 — a plain (non-secret) var, safe to commit. It
+  // was previously set only via the Cloudflare dashboard and got silently
+  // wiped by the next `wrangler deploy` (a CLI deploy replaces the
+  // remote "vars" set with whatever's declared here, unlike secrets —
+  // RESEND_API_KEY, which is a Secret, survived the same deploy
+  // untouched). Committing it here is what makes it survive future
+  // deploys. RESEND_API_KEY itself must never go here — that's a real
+  // credential and stays a dashboard/`wrangler secret put`-only secret.
+  "vars": {
+    "RESEND_FROM_EMAIL": "invoices@mail.ignitesafety.shop"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

@@ -70,18 +70,14 @@ export default function PosClient({
    * technicians' open-jobs list (Session 11). */
   claimForTechnicianId?: string;
   /** Admin previewing this job's POS screen can freely add AND remove
-   * items; a technician can only add to / increase what's already been
-   * saved — see `baselineLines` below (Session 12). */
+   * items — same as a technician now (Session 22, round 17; previously a
+   * technician could only add/increase, never remove a saved line — see
+   * the removed `baselineLines` floor below). */
   isAdminPreview?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(workOrder.status);
   const [lines, setLines] = useState<ServiceLine[]>(workOrder.serviceLines ?? []);
-  // The last-saved cart, used as a floor a technician can't go below —
-  // they can add new items and increase quantities freely, but can't
-  // remove or reduce anything already recorded (Session 12). Admin
-  // preview ignores this entirely.
-  const [baselineLines, setBaselineLines] = useState<ServiceLine[]>(workOrder.serviceLines ?? []);
   const [customLabel, setCustomLabel] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState(workOrder.invoiceNumberIfIssued ?? '');
   const [technicianNotes, setTechnicianNotes] = useState(workOrder.technicianNotes ?? '');
@@ -157,9 +153,6 @@ export default function PosClient({
       if (!res.ok) throw new Error('Could not save — check your connection and try again.');
       if (status === 'PENDING' || status === 'SCHEDULED') setStatus('IN_PROGRESS');
       setProgressSavedAt(new Date());
-      // Whatever just got saved becomes the new floor — a technician can
-      // keep adding from here, but can't undo it (Session 12).
-      setBaselineLines(lines);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -198,29 +191,25 @@ export default function PosClient({
     setCustomLabel('');
   }
 
-  // A technician can add items and raise quantities freely, but can't
-  // drop a line below what's already been saved — only Admin (previewing)
-  // can reduce or remove a committed item (Session 12).
-  function floorFor(key: string): number {
-    if (isAdminPreview) return 0;
-    return baselineLines.find((b) => b.key === key)?.quantity ?? 0;
-  }
-
+  // Session 12 originally locked an already-saved line so a technician
+  // could only add to / increase it, never remove or reduce it — the
+  // rationale being to stop a saved service record from quietly
+  // disappearing. Session 22, round 17 removed that floor per the user's
+  // explicit request: technicians were reporting they couldn't back out
+  // an equipment tap added by mistake. A technician (and admin preview,
+  // unchanged) can now freely add, adjust, or remove any line at any time
+  // — the only remaining gate is `isCompleted` below, which already
+  // disables every one of these controls once the work order is marked
+  // COMPLETED, matching "at all times if the WO is still open."
   function adjustQty(key: string, delta: number) {
     setLines((prev) =>
       prev
-        .map((l) => {
-          if (l.key !== key) return l;
-          const floor = delta < 0 ? floorFor(key) : 0;
-          const nextQty = Math.max(0, l.quantity + delta);
-          return { ...l, quantity: Math.max(nextQty, floor) };
-        })
+        .map((l) => (l.key === key ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l))
         .filter((l) => l.quantity > 0)
     );
   }
 
   function removeLine(key: string) {
-    if (floorFor(key) > 0) return; // already saved — technicians can't remove it, only Admin can
     setLines((prev) => prev.filter((l) => l.key !== key));
   }
 
@@ -433,49 +422,41 @@ export default function PosClient({
                 Tap items on the right to add them here.
               </p>
             )}
-            {lines.map((l) => {
-              const floor = floorFor(l.key);
-              const locked = floor > 0; // already saved — a technician can't reduce/remove it
-              return (
-                <div key={l.key} className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
-                  <div>
-                    <p className="text-sm font-medium text-ink-900">
-                      {l.label} {locked && <span className="text-xs font-normal text-slate-400">🔒 saved</span>}
-                    </p>
-                    <p className="text-xs text-slate-400">{l.kind === 'WORKSHOP' ? 'Workshop action' : l.kind === 'CUSTOM' ? 'Custom' : 'Standard'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isCompleted || (locked && l.quantity <= floor)}
-                      title={locked ? 'Already saved — only Admin can reduce this' : undefined}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-lg font-medium hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => adjustQty(l.key, -1)}
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-base font-semibold">{l.quantity}</span>
-                    <button
-                      type="button"
-                      disabled={isCompleted}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-lg font-medium hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => adjustQty(l.key, 1)}
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isCompleted || locked}
-                      title={locked ? 'Already saved — only Admin can remove this' : undefined}
-                      className="ml-1 text-xs text-red-600 hover:underline disabled:opacity-40"
-                      onClick={() => removeLine(l.key)}
-                    >
-                      Remove
-                    </button>
-                  </div>
+            {lines.map((l) => (
+              <div key={l.key} className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
+                <div>
+                  <p className="text-sm font-medium text-ink-900">{l.label}</p>
+                  <p className="text-xs text-slate-400">{l.kind === 'WORKSHOP' ? 'Workshop action' : l.kind === 'CUSTOM' ? 'Custom' : 'Standard'}</p>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-lg font-medium hover:bg-slate-50 disabled:opacity-40"
+                    onClick={() => adjustQty(l.key, -1)}
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-base font-semibold">{l.quantity}</span>
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-lg font-medium hover:bg-slate-50 disabled:opacity-40"
+                    onClick={() => adjustQty(l.key, 1)}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    className="ml-1 text-xs text-red-600 hover:underline disabled:opacity-40"
+                    onClick={() => removeLine(l.key)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="rounded-xl bg-white p-3 shadow-sm">
