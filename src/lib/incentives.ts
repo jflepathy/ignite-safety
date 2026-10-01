@@ -51,6 +51,16 @@ export type DraftInvoiceLine = {
   /** true when this line couldn't be priced from the catalog and needs a
    * human to fill in a price before the invoice is usable. */
   needsPricing: boolean;
+  /** Whether the matched catalog item is tax-applicable (ShopItem.taxable).
+   * An unmatched/unpriced line (no catalog item to check) defaults to
+   * false -- this app isn't charging VAT yet (every real catalog item is
+   * currently taxable: false), so a line with nothing to check against
+   * should never be taxed by default either. Session 22, round 18 --
+   * previously this field didn't exist and the invoice-form caller
+   * defaulted every auto-populated line to the default tax rate
+   * regardless of this flag, which is what put VAT on every Work-Order-
+   * drafted invoice. */
+  taxable: boolean;
   sourceKey: string; // the serviceLines key this line came from, for traceability
 };
 
@@ -77,6 +87,7 @@ export function buildDraftInvoiceLines(
       quantity: line.quantity,
       unitPrice: shopItem?.unitPrice ?? 0,
       needsPricing: !shopItem,
+      taxable: shopItem?.taxable ?? false,
       sourceKey: line.key,
     });
     if (rate?.bundledShopItemId) {
@@ -88,6 +99,7 @@ export function buildDraftInvoiceLines(
           quantity: line.quantity * (rate.bundledQuantityPerUnit || 1),
           unitPrice: bundled.unitPrice,
           needsPricing: false,
+          taxable: bundled.taxable,
           sourceKey: `${line.key}:bundled`,
         });
       }

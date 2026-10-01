@@ -22,7 +22,7 @@ export default async function NewInvoicePage({
   // recorded serviceLines (Session 16), using the admin-configured
   // Incentive Rates catalog mapping. Sales/admin still review and confirm
   // before saving -- nothing here is final until they click Save.
-  let autoLines: { shopItemId: string | null; description: string; quantity: number; unitPrice: number }[] = [];
+  let autoLines: { shopItemId: string | null; description: string; quantity: number; unitPrice: number; taxable: boolean }[] = [];
   let hasUnpriced = false;
   if (workOrder && Array.isArray(workOrder.serviceLines) && (workOrder.serviceLines as any[]).length > 0) {
     const shopItemsById = new Map(shopItems.map((s) => [s.id, { id: s.id, sku: s.sku, name: s.name, unitPrice: Number(s.unitPrice), taxable: s.taxable }]));
@@ -42,7 +42,7 @@ export default async function NewInvoicePage({
       ])
     );
     const built = buildDraftInvoiceLines(workOrder.serviceLines as unknown as ServiceLine[], ratesByKey, shopItemsById);
-    autoLines = built.map((l) => ({ shopItemId: l.shopItemId, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice }));
+    autoLines = built.map((l) => ({ shopItemId: l.shopItemId, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, taxable: l.taxable }));
     hasUnpriced = built.some((l) => l.needsPricing);
   }
 

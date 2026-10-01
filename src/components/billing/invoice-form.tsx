@@ -84,8 +84,12 @@ export default function InvoiceForm({
   initial?: InvoiceFormInitial;
   /** Create-mode only: lines auto-populated from a Work Order's serviceLines
    * (Session 16) — a starting point the user reviews/edits before saving,
-   * not sent through `initial` since that's an 'edit'-mode-shaped prop. */
-  initialLines?: { shopItemId: string | null; description: string; quantity: number; unitPrice: number }[];
+   * not sent through `initial` since that's an 'edit'-mode-shaped prop.
+   * `taxable` (Session 22, round 18) is the matched catalog item's own
+   * ShopItem.taxable flag -- an unmatched/unpriced line has no catalog
+   * item to check and defaults to false, consistently with "no tax by
+   * default" everywhere else in this form. */
+  initialLines?: { shopItemId: string | null; description: string; quantity: number; unitPrice: number; taxable: boolean }[];
 }) {
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
@@ -116,7 +120,13 @@ export default function InvoiceForm({
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           discountPercent: 0,
-          taxRateId: defaultTaxRate?.id ?? null,
+          // Session 22, round 18 fix -- this used to default every
+          // Work-Order-drafted line to the default tax rate unconditionally,
+          // regardless of whether the matched catalog item is actually
+          // tax-applicable. Now matches the same `item.taxable ? ... : null`
+          // rule applyShopItem()/handleScan() already use below for a
+          // manually-added line.
+          taxRateId: l.taxable ? defaultTaxRate?.id ?? null : null,
         }))
       : [emptyLine()]
   );
