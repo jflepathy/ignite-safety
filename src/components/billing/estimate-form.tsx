@@ -100,6 +100,14 @@ export default function EstimateForm({
   function addLine() {
     setLines((p) => [...p, emptyLine()]);
   }
+  // Removing the only remaining line leaves a fresh blank one in its place,
+  // so there is always a row to type into.
+  function removeLine(key: string) {
+    setLines((p) => {
+      const next = p.filter((l) => l.key !== key);
+      return next.length ? next : [emptyLine()];
+    });
+  }
   // Reorder line items (Session 21).
   function moveLine(key: string, direction: -1 | 1) {
     setLines((prev) => {
@@ -154,7 +162,17 @@ export default function EstimateForm({
           lineItems,
         }),
       });
-      if (!res.ok) throw new Error(`Failed to ${isEdit ? 'save' : 'create'} estimate`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const fe = body?.error;
+        const detail =
+          typeof fe === 'string'
+            ? fe
+            : fe
+            ? [...(fe.formErrors ?? []), ...Object.entries(fe.fieldErrors ?? {}).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`)].join('; ')
+            : '';
+        throw new Error(`Failed to ${isEdit ? 'save' : 'create'} estimate${detail ? ` — ${detail}` : ` (error ${res.status})`}`);
+      }
       const estimate = await res.json();
       const shouldPrint = action === 'print' || printAfterSave;
       router.push(`/billing/estimates/${estimate.id}${shouldPrint ? '?print=1' : ''}`);
@@ -198,7 +216,7 @@ export default function EstimateForm({
               <th className="w-28 py-2 text-right">Unit Price</th>
               <th className="w-32 py-2">Tax</th>
               <th className="w-28 py-2 text-right">Total</th>
-              <th className="w-14 py-2"></th>
+              <th className="w-28 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -270,6 +288,14 @@ export default function EstimateForm({
                       aria-label="Move line down"
                     >
                       ▼
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(line.key)}
+                      className="ml-1 rounded px-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      aria-label="Remove line"
+                    >
+                      Remove
                     </button>
                   </div>
                 </td>

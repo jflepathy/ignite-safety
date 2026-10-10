@@ -238,7 +238,7 @@ export default function SimpleDocForm({
               {taxRates.length > 0 && <th className="w-32 py-2">Tax</th>}
               <th className="w-28 py-2 text-right">Total</th>
               <th className="w-14 py-2" />
-              <th className="w-8 py-2" />
+              <th className="w-20 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -308,11 +308,19 @@ export default function SimpleDocForm({
                   </div>
                 </td>
                 <td className="py-2 text-right">
-                  {lines.length > 1 && (
-                    <button type="button" onClick={() => setLines((p) => p.filter((l) => l.key !== line.key))} className="text-slate-400 hover:text-red-600">
-                      ✕
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLines((p) => {
+                        const next = p.filter((l) => l.key !== line.key);
+                        return next.length ? next : [emptyLine()];
+                      })
+                    }
+                    className="rounded px-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                    aria-label="Remove line"
+                  >
+                    Remove
+                  </button>
                 </td>
               </tr>
             ))}

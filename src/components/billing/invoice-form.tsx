@@ -178,7 +178,10 @@ export default function InvoiceForm({
   }
 
   function removeLine(key: string) {
-    setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev));
+    setLines((prev) => {
+      const next = prev.filter((l) => l.key !== key);
+      return next.length ? next : [emptyLine()];
+    });
   }
 
   // Reorder line items (Session 21) -- the order here is the order they
@@ -451,7 +454,7 @@ export default function InvoiceForm({
                 <th className="w-32 py-2">Tax</th>
                 <th className="w-28 py-2 text-right">Line Total</th>
                 <th className="w-14 py-2"></th>
-                <th className="w-8 py-2"></th>
+                <th className="w-20 py-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -548,10 +551,10 @@ export default function InvoiceForm({
                     <button
                       type="button"
                       onClick={() => removeLine(line.key)}
-                      className="text-slate-400 hover:text-red-600"
+                      className="rounded px-1 text-xs font-medium text-red-600 hover:bg-red-50"
                       aria-label="Remove line"
                     >
-                      ✕
+                      Remove
                     </button>
                   </td>
                 </tr>
