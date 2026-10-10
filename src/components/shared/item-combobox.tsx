@@ -83,7 +83,7 @@ export default function ItemCombobox<T extends ItemOption>({
         onClick={() => setOpen((o) => !o)}
       >
         <span className={selected ? 'truncate' : 'truncate text-slate-400'}>
-          {selected ? `${selected.sku} — ${selected.name}` : 'Custom — type to search…'}
+          {selected ? selected.sku : 'Custom — type to search…'}
         </span>
         <span className="text-slate-400">▾</span>
       </button>
