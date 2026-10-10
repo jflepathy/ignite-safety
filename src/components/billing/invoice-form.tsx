@@ -430,7 +430,7 @@ export default function InvoiceForm({
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
-            <span className="text-xs text-slate-400">Scan a barcode anytime to add an item</span>
+            <span className="text-xs text-slate-400">Scan a barcode anytime to add an item · Set Qty to 0 for a description-only line</span>
           </div>
           <button className="btn-secondary" onClick={addLine} type="button">
             + Add line

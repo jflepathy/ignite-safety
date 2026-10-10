@@ -328,10 +328,13 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     }
 
     setColor(COLOR.ink);
-    pdf.text(li.quantity, colQtyRight, rowTop + FS.sm, { align: 'right' });
-    pdf.text(formatMoney(li.unitPrice, currency), colRateRight, rowTop + FS.sm, { align: 'right' });
-    pdf.setFont('courier', 'bold');
-    pdf.text(formatMoney(li.lineTotal, currency), colAmountRight, rowTop + FS.sm, { align: 'right' });
+    // Quantity 0 = description-only line: no qty / rate / amount printed.
+    if (Number(li.quantity) !== 0) {
+      pdf.text(li.quantity, colQtyRight, rowTop + FS.sm, { align: 'right' });
+      pdf.text(formatMoney(li.unitPrice, currency), colRateRight, rowTop + FS.sm, { align: 'right' });
+      pdf.setFont('courier', 'bold');
+      pdf.text(formatMoney(li.lineTotal, currency), colAmountRight, rowTop + FS.sm, { align: 'right' });
+    }
 
     y += rowHeight;
   }

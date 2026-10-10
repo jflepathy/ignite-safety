@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 const LineItemSchema = z.object({
   shopItemId: z.string().optional().nullable(),
   description: z.string().min(1),
-  quantity: z.number().positive(),
+  quantity: z.number().nonnegative(), // 0 = description-only line (Session 22, round 19)
   unitPrice: z.number().nonnegative(),
   taxRateId: z.string().optional().nullable(),
   taxRatePercent: z.number().min(0).max(100).default(0),

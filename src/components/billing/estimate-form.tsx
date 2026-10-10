@@ -202,7 +202,10 @@ export default function EstimateForm({
 
       <div className="card p-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-ink-900">Line Items</h2>
+            <span className="text-xs text-slate-400">Set Qty to 0 for a description-only line</span>
+          </div>
           <button className="btn-secondary" type="button" onClick={addLine}>
             + Add line
           </button>

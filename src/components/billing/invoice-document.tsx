@@ -225,9 +225,11 @@ export default function InvoiceDocument({
                     </span>
                   )}
                 </td>
-                <td className="py-2.5 pr-2 text-right align-top">{li.quantity}</td>
-                <td className="py-2.5 pr-2 text-right align-top">{formatMoney(li.unitPrice, currency)}</td>
-                <td className="py-2.5 pr-0 text-right align-top font-medium">{formatMoney(li.lineTotal, currency)}</td>
+                {/* A quantity of 0 marks a description-only line (a note on the
+                    document): no qty, rate or amount is shown for it. */}
+                <td className="py-2.5 pr-2 text-right align-top">{Number(li.quantity) === 0 ? '' : li.quantity}</td>
+                <td className="py-2.5 pr-2 text-right align-top">{Number(li.quantity) === 0 ? '' : formatMoney(li.unitPrice, currency)}</td>
+                <td className="py-2.5 pr-0 text-right align-top font-medium">{Number(li.quantity) === 0 ? '' : formatMoney(li.lineTotal, currency)}</td>
               </tr>
             ))}
           </tbody>

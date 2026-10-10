@@ -66,6 +66,8 @@ export async function createEquipmentForSoldLines(params: {
 
   for (const line of lines) {
     if (!line.shopItemId) continue;
+    // Quantity 0 = a description-only line (nothing was actually sold).
+    if (Number(line.quantity) === 0) continue;
     const category = categoryByItemId.get(line.shopItemId);
     if (!category) continue;
 

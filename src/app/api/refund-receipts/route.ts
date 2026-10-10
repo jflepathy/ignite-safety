@@ -16,7 +16,7 @@ export async function GET() {
 
 const LineSchema = z.object({
   description: z.string().min(1),
-  quantity: z.number().positive(),
+  quantity: z.number().nonnegative(), // 0 = description-only line (Session 22, round 19)
   unitPrice: z.number().nonnegative(),
 });
 
