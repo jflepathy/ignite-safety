@@ -5,6 +5,7 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 const BodySchema = z.object({
   paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).default('CASH'),
@@ -77,20 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // createMany() also requires a transaction under the Neon HTTP adapter
   // (confirmed by direct testing — not just nested `create`), so rows go
   // in one at a time.
-  for (let idx = 0; idx < foldedLines.length; idx++) {
-    const li = foldedLines[idx];
-    await prisma.salesReceiptLineItem.create({
-      data: {
-        salesReceiptId: createdReceipt.id,
-        shopItemId: li.shopItemId,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        taxRateId: li.taxRateId,
-        lineTotal: totals.lines[idx].lineTotal,
-      },
-    });
-  }
+  await insertSalesReceiptLines(createdReceipt.id, foldedLines.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal })));
 
   await prisma.estimate.update({ where: { id: params.id }, data: { status: 'CONVERTED' } });
 

@@ -5,6 +5,7 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -83,20 +84,7 @@ export async function POST(req: NextRequest) {
   // createMany() also requires a transaction under the Neon HTTP adapter
   // (confirmed by direct testing — not just nested `create`), so rows go
   // in one at a time.
-  for (let idx = 0; idx < data.lineItems.length; idx++) {
-    const li = data.lineItems[idx];
-    await prisma.salesReceiptLineItem.create({
-      data: {
-        salesReceiptId: createdReceipt.id,
-        shopItemId: li.shopItemId || null,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        taxRateId: li.taxRateId || null,
-        lineTotal: totals.lines[idx].lineTotal,
-      },
-    });
-  }
+  await insertSalesReceiptLines(createdReceipt.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal })));
 
   // See the matching note in api/invoices/route.ts — a sold fire
   // extinguisher/blanket/hose reel/smoke or heat detector becomes a new

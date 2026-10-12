@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -76,22 +77,7 @@ export async function POST(req: NextRequest) {
   // createMany() also requires a transaction under the Neon HTTP adapter
   // (confirmed by direct testing — not just nested `create`), so rows go
   // in one at a time.
-  for (let idx = 0; idx < data.lineItems.length; idx++) {
-    const li = data.lineItems[idx];
-    await prisma.estimateLineItem.create({
-      data: {
-        estimateId: createdEstimate.id,
-        shopItemId: li.shopItemId || null,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        discountPercent: li.discountPercent,
-        taxRateId: li.taxRateId || null,
-        lineTotal: totals.lines[idx].lineTotal,
-        sortOrder: idx,
-      },
-    });
-  }
+  await insertEstimateOrInvoiceLines('estimate', createdEstimate.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal, sortOrder: idx })));
 
   const estimate = await prisma.estimate.findUnique({
     where: { id: createdEstimate.id },

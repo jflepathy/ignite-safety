@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -89,22 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.taxInclusive ?? existing.taxInclusive
     );
     await prisma.estimateLineItem.deleteMany({ where: { estimateId: params.id } });
-    for (let idx = 0; idx < data.lineItems.length; idx++) {
-      const li = data.lineItems[idx];
-      await prisma.estimateLineItem.create({
-        data: {
-          estimateId: params.id,
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          discountPercent: li.discountPercent,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-          sortOrder: idx,
-        },
-      });
-    }
+    await insertEstimateOrInvoiceLines('estimate', params.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal, sortOrder: idx })));
     totalsPatch = {
       subtotal: totals.subtotal,
       discountTotal: totals.discountTotal,

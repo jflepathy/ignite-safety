@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -83,22 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // as nested `create` — see the note in src/app/api/invoices/route.ts.
     // Rows go in one at a time instead.
     await prisma.invoiceLineItem.deleteMany({ where: { invoiceId: params.id } });
-    for (let idx = 0; idx < data.lineItems.length; idx++) {
-      const li = data.lineItems[idx];
-      await prisma.invoiceLineItem.create({
-        data: {
-          invoiceId: params.id,
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          discountPercent: li.discountPercent,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-          sortOrder: idx,
-        },
-      });
-    }
+    await insertEstimateOrInvoiceLines('invoice', params.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal, sortOrder: idx })));
     totalsPatch = {
       subtotal: totals.subtotal,
       discountTotal: totals.discountTotal,

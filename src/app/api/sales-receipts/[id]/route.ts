@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -70,20 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Sequential writes, not createMany()/a transaction -- the Neon HTTP
     // driver adapter can't run either (see src/app/api/invoices/route.ts).
     await prisma.salesReceiptLineItem.deleteMany({ where: { salesReceiptId: params.id } });
-    for (let idx = 0; idx < data.lineItems.length; idx++) {
-      const li = data.lineItems[idx];
-      await prisma.salesReceiptLineItem.create({
-        data: {
-          salesReceiptId: params.id,
-          shopItemId: li.shopItemId || null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          taxRateId: li.taxRateId || null,
-          lineTotal: totals.lines[idx].lineTotal,
-        },
-      });
-    }
+    await insertSalesReceiptLines(params.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal })));
     totalsPatch = {
       subtotal: totals.subtotal,
       taxTotal: totals.taxTotal,

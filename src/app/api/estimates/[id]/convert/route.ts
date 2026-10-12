@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
+import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 // Converts an accepted Estimate/Quote into a DRAFT Invoice with identical
 // line items, preserving the QuickBooks-style "manual" billing flow: the
@@ -44,21 +45,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   // createMany() also requires a transaction under the Neon HTTP adapter
   // (confirmed by direct testing — not just nested `create`), so rows go
   // in one at a time.
-  for (const li of estimate.lineItems) {
-    await prisma.invoiceLineItem.create({
-      data: {
-        invoiceId: createdInvoice.id,
-        shopItemId: li.shopItemId,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        discountPercent: li.discountPercent,
-        taxRateId: li.taxRateId,
-        lineTotal: li.lineTotal,
-        sortOrder: li.sortOrder,
-      },
-    });
-  }
+  await insertEstimateOrInvoiceLines('invoice', createdInvoice.id, estimate.lineItems);
 
   await prisma.estimate.update({ where: { id: params.id }, data: { status: 'CONVERTED' } });
 

@@ -6,6 +6,7 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET(req: NextRequest) {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -177,22 +178,7 @@ export async function POST(req: NextRequest) {
   // nested writes under the Neon HTTP adapter (confirmed by direct testing
   // — it's not just nested `create`), so line items are inserted one at a
   // time instead.
-  for (let idx = 0; idx < data.lineItems.length; idx++) {
-    const li = data.lineItems[idx];
-    await prisma.invoiceLineItem.create({
-      data: {
-        invoiceId: createdInvoice.id,
-        shopItemId: li.shopItemId || null,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        discountPercent: li.discountPercent,
-        taxRateId: li.taxRateId || null,
-        lineTotal: totals.lines[idx].lineTotal,
-        sortOrder: idx,
-      },
-    });
-  }
+  await insertEstimateOrInvoiceLines('invoice', createdInvoice.id, data.lineItems.map((li, idx) => ({ ...li, lineTotal: totals.lines[idx].lineTotal, sortOrder: idx })));
 
   // Any line item that's a tagged piece of trackable safety equipment
   // (fire extinguisher, blanket, hose reel, smoke/heat detector — see
