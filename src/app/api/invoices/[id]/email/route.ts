@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { paymentLinesForDocument } from '@/lib/payment-lines';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { sendEmail, EmailNotConfiguredError } from '@/lib/email';
@@ -30,6 +31,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       include: {
         customer: true,
         lineItems: { include: { taxRate: true, shopItem: true }, orderBy: { sortOrder: 'asc' } },
+        payments: true,
       },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
@@ -82,6 +84,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     taxTotal: invoice.taxTotal.toString(),
     total: invoice.total.toString(),
     amountPaid: invoice.amountPaid.toString(),
+    payments: paymentLinesForDocument(invoice.payments as any),
     balanceDue: invoice.balanceDue.toString(),
     taxInclusive: invoice.taxInclusive,
     customerMessage: invoice.customerMessage,

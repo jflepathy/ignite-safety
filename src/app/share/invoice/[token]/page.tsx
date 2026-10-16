@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { paymentLinesForDocument } from '@/lib/payment-lines';
 import { notFound } from 'next/navigation';
 import { StatusBadge } from '@/components/status-badge';
 import PrintButton from '@/components/print-button';
@@ -73,6 +74,7 @@ export default async function SharedInvoicePage({ params }: { params: { token: s
           taxTotal={invoice.taxTotal.toString()}
           total={invoice.total.toString()}
           amountPaid={invoice.amountPaid.toString()}
+          payments={paymentLinesForDocument(invoice.payments as any)}
           balanceDue={invoice.balanceDue.toString()}
           taxInclusive={invoice.taxInclusive}
           customerMessage={invoice.customerMessage}

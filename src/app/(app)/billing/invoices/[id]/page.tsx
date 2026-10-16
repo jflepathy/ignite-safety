@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { paymentLinesForDocument } from '@/lib/payment-lines';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
@@ -92,6 +93,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
     taxTotal: invoice.taxTotal.toString(),
     total: invoice.total.toString(),
     amountPaid: invoice.amountPaid.toString(),
+    payments: paymentLinesForDocument(invoice.payments as any),
     balanceDue: invoice.balanceDue.toString(),
     taxInclusive: invoice.taxInclusive,
     customerMessage: invoice.customerMessage,

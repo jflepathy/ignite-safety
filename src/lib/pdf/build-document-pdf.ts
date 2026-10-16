@@ -107,6 +107,9 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     customer,
     lineItems,
     currency,
+    total,
+    amountPaid,
+    payments,
     balanceDue,
     totalLabel = 'Balance Due',
   } = doc;
@@ -343,7 +346,8 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
   y += 20;
 
   // --- Payment Methods / TIN / Bank Details (left) and Total (right), side by side ---
-  ensureRoom(90);
+  // Room for the Payment Methods block plus Total + one line per payment.
+  ensureRoom(90 + (payments?.length ?? 0) * 17);
   const footerTop = y;
   const paymentBlockWidth = 220;
   const totalsBlockWidth = 220;
@@ -386,10 +390,37 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     }
   }
 
-  // Total block, right-aligned
+  // Total block, right-aligned. When payments have been recorded, the Total
+  // and each payment received print above the balance due so the paper/PDF
+  // copy shows why the amount due is lower than the invoice total.
   const totalsX0 = contentX1 - totalsBlockWidth;
   line(totalsX0, footerTop, contentX1, footerTop, COLOR.slate200, 1);
-  const totalsY = footerTop + 16;
+  let totalsY = footerTop + 16;
+  const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
+  if (hasPaid) {
+    const rows: { label: string; value: string; bold?: boolean }[] = [{ label: 'Total', value: formatMoney(total, currency), bold: true }];
+    if (payments && payments.length > 0) {
+      for (const p of payments) {
+        rows.push({ label: `${p.date} ${p.method}${p.reference ? ` ${p.reference}` : ''}`, value: `-${formatMoney(p.amount, currency)}` });
+      }
+    } else {
+      rows.push({ label: 'Paid', value: `-${formatMoney(amountPaid!, currency)}` });
+    }
+    pdf.setFontSize(FS.xs);
+    for (const r of rows) {
+      pdf.setFont('courier', r.bold ? 'bold' : 'normal');
+      setColor(r.bold ? COLOR.ink : COLOR.slate600);
+      const valueWidth = pdf.getTextWidth(r.value);
+      const labelMax = totalsBlockWidth - valueWidth - 8;
+      const label = (pdf.splitTextToSize(r.label, labelMax)[0] as string) ?? r.label;
+      pdf.text(label, totalsX0, totalsY + FS.xs);
+      pdf.text(r.value, contentX1, totalsY + FS.xs, { align: 'right' });
+      totalsY += FS.xs + 5;
+    }
+    totalsY += 4;
+    line(totalsX0, totalsY, contentX1, totalsY, COLOR.slate200, 1);
+    totalsY += 10;
+  }
   pdf.setFont('courier', 'bold');
   pdf.setFontSize(FS.xs);
   setColor(COLOR.slate500);
