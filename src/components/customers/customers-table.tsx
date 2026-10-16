@@ -39,7 +39,7 @@ export const DISTRICTS_BY_REGION: Record<string, string[]> = {
     'Anse aux Pins', 'Anse Boileau', 'Anse Etoile', 'Au Cap', 'Anse Royale',
     'Baie Lazare', 'Beau Vallon', 'Bel Ombre', 'Cascade', 'Glacis',
     "Grand'Anse Mahe", 'Pointe La Rue', 'Port Glaud', 'Takamaka',
-    'Bel Air', 'English River', 'Mont Buxton', 'Mont Fleuri', 'Plaisance',
+    'Bel Air', 'English River', 'Mont Buxton', 'Mont Fleuri', 'Perseverance', 'Plaisance',
     'Saint Louis', 'Les Mamelles', 'Roche Caiman',
   ],
   Praslin: ['Baie Sainte Anne', "Grand'Anse Praslin"],
