@@ -293,10 +293,7 @@ export default function InvoiceDocument({
                   (payments && payments.length > 0 ? (
                     payments.map((p, i) => (
                       <div key={i} className="flex justify-between text-slate-600">
-                        <span>
-                          Payment {p.date} ({p.method}
-                          {p.reference ? `, ${p.reference}` : ''})
-                        </span>
+                        <span>Payment {p.date}</span>
                         <span>-{formatMoney(p.amount, currency)}</span>
                       </div>
                     ))

@@ -401,7 +401,7 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     const rows: { label: string; value: string; bold?: boolean }[] = [{ label: 'Total', value: formatMoney(total, currency), bold: true }];
     if (payments && payments.length > 0) {
       for (const p of payments) {
-        rows.push({ label: `${p.date} ${p.method}${p.reference ? ` ${p.reference}` : ''}`, value: `-${formatMoney(p.amount, currency)}` });
+        rows.push({ label: `Payment ${p.date}`, value: `-${formatMoney(p.amount, currency)}` });
       }
     } else {
       rows.push({ label: 'Paid', value: `-${formatMoney(amountPaid!, currency)}` });
