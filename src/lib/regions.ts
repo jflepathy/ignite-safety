@@ -16,6 +16,7 @@ export const REGION_DISTRICTS: Record<string, string[]> = {
     'Les Mamelles',
     'Mont Buxton',
     'Mont Fleuri',
+    'Perseverance',
     'Plaisance',
     'Pointe Larue',
     'Port Glaud',
