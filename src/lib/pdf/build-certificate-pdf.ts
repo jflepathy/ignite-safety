@@ -74,7 +74,7 @@ export function buildCertificatePdf(d: CertificateData): jsPDF {
   };
 
   if (d.items.length) {
-    const c = { no: x0, type: x0 + 22, ser: x0 + 120, loc: x0 + 210, res: x0 + 300, note: x0 + 345 };
+    const c = { no: x0, type: x0 + 18, ser: x0 + 130, loc: x0 + 215, res: x0 + 292, note: x0 + 335 };
     const head = () => {
       pdf.setFont('courier', 'bold').setFontSize(7.5).setTextColor(...grey);
       pdf.text('#', c.no, y);
@@ -94,8 +94,8 @@ export function buildCertificatePdf(d: CertificateData): jsPDF {
       room(h, head);
       pdf.setFont('courier', 'normal').setFontSize(8.5).setTextColor(...ink);
       pdf.text(String(it.no), c.no, y);
-      pdf.text(it.type.slice(0, 16), c.type, y);
-      pdf.text((it.serial || '-').slice(0, 14), c.ser, y);
+      pdf.text(it.type.slice(0, 20), c.type, y);
+      pdf.text((it.serial || '-').slice(0, 15), c.ser, y);
       pdf.text((it.location || '-').slice(0, 14), c.loc, y);
       pdf.setFont('courier', 'bold').setTextColor(...(it.result === 'FAIL' ? red : ink)).text(it.result, c.res, y);
       pdf.setFont('courier', 'normal').setTextColor(...grey);

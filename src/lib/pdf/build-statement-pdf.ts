@@ -13,6 +13,7 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   const x1 = W - 14 * MM;
   const bottom = H - 16 * MM;
   const m = (n: number) => formatMoney(n, d.currency);
+  const num = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const ink: [number, number, number] = [15, 23, 42];
   const grey: [number, number, number] = [100, 116, 139];
   const red: [number, number, number] = [236, 47, 47];
@@ -52,13 +53,13 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   pdf.text(d.fromDate ? `${d.fromDate} - ${d.toDate}` : `To ${d.toDate}`, x1, y + 16, { align: 'right' });
   y = Math.max(ya, y + 24) + 12;
 
-  const cols = { date: x0, ref: x0 + 58, desc: x0 + 128, chg: x1 - 150, pay: x1 - 78, bal: x1 };
+  const cols = { date: x0, ref: x0 + 56, desc: x0 + 112, chg: x1 - 130, pay: x1 - 66, bal: x1 };
   const head = () => {
     pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...grey);
     pdf.text('DATE', cols.date, y);
     pdf.text('REF', cols.ref, y);
     pdf.text('DESCRIPTION', cols.desc, y);
-    pdf.text('CHARGES', cols.chg, y, { align: 'right' });
+    pdf.text(`CHARGES (${d.currency})`.slice(0, 15), cols.chg, y, { align: 'right' });
     pdf.text('PAYMENTS', cols.pay, y, { align: 'right' });
     pdf.text('BALANCE', cols.bal, y, { align: 'right' });
     y += 4;
@@ -78,7 +79,7 @@ export function buildStatementPdf(d: StatementData): jsPDF {
     pdf.setFont('courier', italic ? 'italic' : 'normal').setFontSize(8.5).setTextColor(...ink);
     pdf.text(date, cols.date, y);
     pdf.text(ref, cols.ref, y);
-    pdf.text(desc.length > 30 ? desc.slice(0, 29) + '…' : desc, cols.desc, y);
+    pdf.text(desc.length > 34 ? desc.slice(0, 33) + '…' : desc, cols.desc, y);
     if (chg) pdf.text(chg, cols.chg, y, { align: 'right' });
     if (pay) pdf.text(pay, cols.pay, y, { align: 'right' });
     pdf.text(bal, cols.bal, y, { align: 'right' });
@@ -86,8 +87,8 @@ export function buildStatementPdf(d: StatementData): jsPDF {
     pdf.setDrawColor(226, 232, 240).setLineWidth(0.5).line(x0, y, x1, y);
     y += 10;
   };
-  if (d.fromDate) row(d.fromDate, '', 'Balance brought forward', '', '', m(d.openingBalance), true);
-  for (const l of d.lines) row(l.date, l.ref, l.description, l.charge ? m(l.charge) : '', l.credit ? m(l.credit) : '', m(l.balance));
+  if (d.fromDate) row(d.fromDate, '', 'Balance brought forward', '', '', num(d.openingBalance), true);
+  for (const l of d.lines) row(l.date, l.ref, l.description, l.charge ? num(l.charge) : '', l.credit ? num(l.credit) : '', num(l.balance));
   if (d.lines.length === 0) {
     room(20);
     pdf.setFontSize(9).setTextColor(...grey).text('No activity in this period.', x0 + 4, y);
@@ -98,9 +99,9 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   y += 13;
   pdf.setFont('courier', 'bold').setFontSize(9).setTextColor(...ink);
   pdf.text('TOTAL', cols.date, y);
-  pdf.text(m(d.totalCharges), cols.chg, y, { align: 'right' });
-  pdf.text(m(d.totalCredits), cols.pay, y, { align: 'right' });
-  pdf.text(m(d.closingBalance), cols.bal, y, { align: 'right' });
+  pdf.text(num(d.totalCharges), cols.chg, y, { align: 'right' });
+  pdf.text(num(d.totalCredits), cols.pay, y, { align: 'right' });
+  pdf.text(num(d.closingBalance), cols.bal, y, { align: 'right' });
   y += 26;
 
   if (d.openInvoices.length) {

@@ -84,11 +84,15 @@ export async function buildStatement(customerId: string, opts: { from?: Date | n
     });
     for (const p of inv.payments) {
       if (p.verificationStatus === 'PENDING_REVIEW' || p.verificationStatus === 'MISMATCH') continue;
+      // A payment recorded against an invoice dated after it (e.g. an
+      // opening-balance invoice raised later) is placed on the invoice date
+      // so the running balance never dips below what was actually owed.
+      const late = p.paidAt < inv.issueDate;
       txs.push({
-        at: p.paidAt,
+        at: late ? inv.issueDate : p.paidAt,
         type: 'PAYMENT',
         ref: inv.invoiceNumber,
-        description: `Payment received - ${METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference})` : ''}`,
+        description: `Payment${late ? ' of ' + formatDate(p.paidAt) : ''} - ${METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference.slice(0, 40)})` : ''}`,
         charge: 0,
         credit: Number(p.amount),
       });
