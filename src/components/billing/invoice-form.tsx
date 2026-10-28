@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
 import CustomerCombobox from '@/components/shared/customer-combobox';
 import ItemCombobox from '@/components/shared/item-combobox';
+import { duplicateLine, useLineDrag } from '@/lib/use-line-drag';
 import { useBarcodeScanner } from '@/lib/use-barcode-scanner';
 
 type Customer = { id: string; displayName: string; terms?: string | null };
@@ -168,6 +169,8 @@ export default function InvoiceForm({
     if (!TERMS_PRESETS.includes(preferred)) setTerms(preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
+
+  const lineDrag = useLineDrag(setLines);
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -445,6 +448,7 @@ export default function InvoiceForm({
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase text-slate-500">
+                <th className="w-6 py-2" />
                 <th className="w-56 py-2">Item</th>
                 <th className="w-24 py-2">SKU</th>
                 <th className="py-2">Description</th>
@@ -453,13 +457,23 @@ export default function InvoiceForm({
                 <th className="w-24 py-2 text-right">Disc %</th>
                 <th className="w-32 py-2">Tax</th>
                 <th className="w-28 py-2 text-right">Line Total</th>
-                <th className="w-14 py-2"></th>
+                <th className="w-20 py-2"></th>
                 <th className="w-20 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {lines.map((line, idx) => (
-                <tr key={line.key} className="border-t border-slate-100">
+                <tr key={line.key} {...lineDrag.rowProps(line.key)} className={`border-t border-slate-100 ${lineDrag.rowClass(line.key)}`}>
+                <td className="w-6 py-2 pr-1 text-center">
+                  <span
+                    {...lineDrag.handleProps(line.key)}
+                    className="cursor-grab select-none text-base leading-none text-slate-300 hover:text-slate-500"
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                  >
+                    ⠿
+                  </span>
+                </td>
                   <td className="py-2 pr-2">
                     <ItemCombobox
                       items={shopItems}
@@ -482,8 +496,9 @@ export default function InvoiceForm({
                   <td className="py-2 pr-2">
                     <input
                       type="number"
+                    onWheel={(e) => e.currentTarget.blur()}
                       min={0}
-                      className="input text-right"
+                      className="input no-spin text-right"
                       value={line.quantity}
                       onChange={(e) => updateLine(line.key, { quantity: parseFloat(e.target.value) || 0 })}
                     />
@@ -491,9 +506,10 @@ export default function InvoiceForm({
                   <td className="py-2 pr-2">
                     <input
                       type="number"
+                    onWheel={(e) => e.currentTarget.blur()}
                       min={0}
                       step="0.01"
-                      className="input text-right"
+                      className="input no-spin text-right"
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.key, { unitPrice: parseFloat(e.target.value) || 0 })}
                     />
@@ -501,9 +517,10 @@ export default function InvoiceForm({
                   <td className="py-2 pr-2">
                     <input
                       type="number"
+                    onWheel={(e) => e.currentTarget.blur()}
                       min={0}
                       max={100}
-                      className="input text-right"
+                      className="input no-spin text-right"
                       value={line.discountPercent}
                       onChange={(e) => updateLine(line.key, { discountPercent: parseFloat(e.target.value) || 0 })}
                     />
@@ -545,6 +562,15 @@ export default function InvoiceForm({
                       >
                         ▼
                       </button>
+                    <button
+                      type="button"
+                      onClick={() => setLines((p) => duplicateLine(p, line.key))}
+                      className="text-slate-400 hover:text-ink-900"
+                      aria-label="Duplicate line"
+                      title="Duplicate line"
+                    >
+                      ⧉
+                    </button>
                     </div>
                   </td>
                   <td className="py-2 text-right">

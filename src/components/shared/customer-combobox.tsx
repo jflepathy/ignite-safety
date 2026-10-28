@@ -29,6 +29,7 @@ export default function CustomerCombobox({
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,7 @@ export default function CustomerCombobox({
           displayName: newName.trim(),
           phone: newPhone.trim() || undefined,
           email: newEmail.trim() || undefined,
+          address: newAddress.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -80,6 +82,7 @@ export default function CustomerCombobox({
       setNewName('');
       setNewPhone('');
       setNewEmail('');
+      setNewAddress('');
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -147,6 +150,13 @@ export default function CustomerCombobox({
               <input className="input" placeholder="Name *" value={newName} onChange={(e) => setNewName(e.target.value)} />
               <input className="input" placeholder="Phone (optional)" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
               <input className="input" placeholder="Email (optional)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              <textarea
+                className="input min-h-[4.5rem]"
+                placeholder="Address (optional)"
+                rows={3}
+                value={newAddress}
+                onChange={(e) => setNewAddress(e.target.value)}
+              />
               {error && <p className="text-xs text-red-600">{error}</p>}
               <div className="flex justify-end gap-2 pt-1">
                 <button

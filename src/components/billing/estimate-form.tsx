@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { computeDocumentTotals } from '@/lib/money';
 import CustomerCombobox from '@/components/shared/customer-combobox';
 import ItemCombobox from '@/components/shared/item-combobox';
+import { duplicateLine, useLineDrag } from '@/lib/use-line-drag';
 
 type Customer = { id: string; displayName: string };
 type ShopItem = { id: string; sku: string; name: string; unitPrice: string; taxable: boolean };
@@ -83,6 +84,8 @@ export default function EstimateForm({
       ),
     [lines, taxRates]
   );
+
+  const lineDrag = useLineDrag(setLines);
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -213,18 +216,29 @@ export default function EstimateForm({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase text-slate-500">
+                <th className="w-6 py-2" />
               <th className="w-56 py-2">Item</th>
               <th className="py-2">Description</th>
               <th className="w-20 py-2 text-right">Qty</th>
               <th className="w-28 py-2 text-right">Unit Price</th>
               <th className="w-32 py-2">Tax</th>
               <th className="w-28 py-2 text-right">Total</th>
-              <th className="w-28 py-2"></th>
+              <th className="w-36 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {lines.map((line, idx) => (
-              <tr key={line.key} className="border-t border-slate-100">
+              <tr key={line.key} {...lineDrag.rowProps(line.key)} className={`border-t border-slate-100 ${lineDrag.rowClass(line.key)}`}>
+                <td className="w-6 py-2 pr-1 text-center">
+                  <span
+                    {...lineDrag.handleProps(line.key)}
+                    className="cursor-grab select-none text-base leading-none text-slate-300 hover:text-slate-500"
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                  >
+                    ⠿
+                  </span>
+                </td>
                 <td className="py-2 pr-2">
                   <ItemCombobox
                     items={shopItems}
@@ -243,7 +257,8 @@ export default function EstimateForm({
                 <td className="py-2 pr-2">
                   <input
                     type="number"
-                    className="input text-right"
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="input no-spin text-right"
                     value={line.quantity}
                     onChange={(e) => updateLine(line.key, { quantity: parseFloat(e.target.value) || 0 })}
                   />
@@ -251,8 +266,9 @@ export default function EstimateForm({
                 <td className="py-2 pr-2">
                   <input
                     type="number"
+                    onWheel={(e) => e.currentTarget.blur()}
                     step="0.01"
-                    className="input text-right"
+                    className="input no-spin text-right"
                     value={line.unitPrice}
                     onChange={(e) => updateLine(line.key, { unitPrice: parseFloat(e.target.value) || 0 })}
                   />
@@ -291,6 +307,15 @@ export default function EstimateForm({
                       aria-label="Move line down"
                     >
                       ▼
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLines((p) => duplicateLine(p, line.key))}
+                      className="text-slate-400 hover:text-ink-900"
+                      aria-label="Duplicate line"
+                      title="Duplicate line"
+                    >
+                      ⧉
                     </button>
                     <button
                       type="button"
