@@ -193,31 +193,31 @@ enum PayType {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  username     String   @unique // login identifier as of Session 7 — email is kept for records/contact only, no longer used to sign in
-  email        String?  @unique // optional as of Session 15 — a login (e.g. a non-person "Admin Ops" assignment account) doesn't require one; still unique when provided
-  passwordHash String
-  role         UserRole @default(SALES)
-  phone        String?
-  active       Boolean  @default(true)
+  id                  String    @id @default(cuid())
+  name                String
+  username            String    @unique // login identifier as of Session 7 — email is kept for records/contact only, no longer used to sign in
+  email               String?   @unique // optional as of Session 15 — a login (e.g. a non-person "Admin Ops" assignment account) doesn't require one; still unique when provided
+  passwordHash        String
+  role                UserRole  @default(SALES)
+  phone               String?
+  active              Boolean   @default(true)
   // Login attempt limiting (Session 7): failedLoginAttempts resets to 0 on
   // any successful login; after 5 consecutive failures the account is
   // locked (lockedUntil set) for an escalating cooldown so automated
   // password-guessing can't run unlimited combinations against one account.
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Relations
-  createdServiceRequests ServiceRequest[] @relation("ServiceRequestCreatedBy")
-  assignedWorkOrders     WorkOrder[]      @relation("WorkOrderTechnician")
-  additionalWorkOrders   WorkOrderTechnician[] @relation("WorkOrderAdditionalTechnician")
-  createdInvoices        Invoice[]        @relation("InvoiceCreatedBy")
-  createdEstimates       Estimate[]       @relation("EstimateCreatedBy")
-  recordedPayments       Payment[]        @relation("PaymentRecordedBy")
-  settingsUpdates        AppSettings[]    @relation("SettingsUpdatedBy")
+  createdServiceRequests ServiceRequest[]         @relation("ServiceRequestCreatedBy")
+  assignedWorkOrders     WorkOrder[]              @relation("WorkOrderTechnician")
+  additionalWorkOrders   WorkOrderTechnician[]    @relation("WorkOrderAdditionalTechnician")
+  createdInvoices        Invoice[]                @relation("InvoiceCreatedBy")
+  createdEstimates       Estimate[]               @relation("EstimateCreatedBy")
+  recordedPayments       Payment[]                @relation("PaymentRecordedBy")
+  settingsUpdates        AppSettings[]            @relation("SettingsUpdatedBy")
   auditLogs              AuditLog[]
   permissionOverrides    UserPermissionOverride[]
 
@@ -239,14 +239,14 @@ model User {
 // When no override row exists for a user+module+action, the appropriate
 // default applies (role default for view; deny for edit, admin excepted).
 model UserPermissionOverride {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  moduleKey  String
-  action     String   @default("view") // "view" | "edit"
-  allowed    Boolean
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleKey String
+  action    String   @default("view") // "view" | "edit"
+  allowed   Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, moduleKey, action])
   @@map("user_permission_overrides")
@@ -272,35 +272,37 @@ model ExchangeRate {
 // ---------------------------------------------------------------------------
 
 model Customer {
-  id            String       @id @default(cuid())
-  displayName   String
-  type          CustomerType @default(COMPANY)
-  contactPerson String?
-  phone         String?
-  altPhone      String?
-  email         String?
-  address       String?
-  region        String? // broad area, e.g. Mahe, Praslin, La Digue
-  district      String? // specific district within the region, e.g. Anse Etoile
-  taxId         String? // local VAT / business registration number
-  terms         String? // this customer's own default invoice Terms (e.g. "Net 30"), overriding the company-wide default when set (Session 18)
-  notes         String?
-  active        Boolean      @default(true)
-  deletedAt     DateTime? // soft delete -> Recycle Bin
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  displayName    String
+  type           CustomerType @default(COMPANY)
+  contactPerson  String?
+  phone          String?
+  altPhone       String?
+  email          String?
+  address        String?
+  region         String? // broad area, e.g. Mahe, Praslin, La Digue
+  district       String? // specific district within the region, e.g. Anse Etoile
+  taxId          String? // local VAT / business registration number
+  terms          String? // this customer's own default invoice Terms (e.g. "Net 30"), overriding the company-wide default when set (Session 18)
+  notes          String?
+  active         Boolean      @default(true)
+  statementToken String?      @unique // public statement share link (Session 23)
+  deletedAt      DateTime? // soft delete -> Recycle Bin
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  sites           CustomerSite[]
-  equipment       Equipment[]
-  serviceRequests ServiceRequest[]
-  workOrders      WorkOrder[]
-  invoices        Invoice[]
-  estimates       Estimate[]
-  creditNotes     CreditNote[]
-  salesOrders     SalesOrder[]
-  salesReceipts   SalesReceipt[]
-  refundReceipts  RefundReceipt[]
-  opportunities   Opportunity[]
+  sites            CustomerSite[]
+  equipment        Equipment[]
+  serviceRequests  ServiceRequest[]
+  workOrders       WorkOrder[]
+  invoices         Invoice[]
+  estimates        Estimate[]
+  creditNotes      CreditNote[]
+  salesOrders      SalesOrder[]
+  salesReceipts    SalesReceipt[]
+  refundReceipts   RefundReceipt[]
+  opportunities    Opportunity[]
+  servicingBatches ServicingBatch[]
 
   @@index([displayName])
   @@map("customers")
@@ -407,17 +409,17 @@ model ShopItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoiceLineItems     InvoiceLineItem[]
-  estimateLineItems    EstimateLineItem[]
-  creditNoteLines      CreditNoteLineItem[]
-  salesOrderLines      SalesOrderLineItem[]
-  salesReceiptLines    SalesReceiptLineItem[]
-  refundReceiptLines   RefundReceiptLineItem[]
-  purchaseOrderLines   PurchaseOrderLineItem[]
-  billLines            BillLineItem[]
-  inventoryAdjustments InventoryAdjustment[]
-  incentiveRates       IncentiveRate[]         @relation("IncentiveRateShopItem")
-  bundledInIncentiveRates IncentiveRate[]      @relation("IncentiveRateBundledItem")
+  invoiceLineItems        InvoiceLineItem[]
+  estimateLineItems       EstimateLineItem[]
+  creditNoteLines         CreditNoteLineItem[]
+  salesOrderLines         SalesOrderLineItem[]
+  salesReceiptLines       SalesReceiptLineItem[]
+  refundReceiptLines      RefundReceiptLineItem[]
+  purchaseOrderLines      PurchaseOrderLineItem[]
+  billLines               BillLineItem[]
+  inventoryAdjustments    InventoryAdjustment[]
+  incentiveRates          IncentiveRate[]         @relation("IncentiveRateShopItem")
+  bundledInIncentiveRates IncentiveRate[]         @relation("IncentiveRateBundledItem")
 
   @@map("shop_items")
 }
@@ -452,9 +454,9 @@ model IncentiveRate {
 
   // e.g. F/Ext servicing (key "fext") auto-bundles 1 x Service Tags (SRO001)
   // onto the invoice/incentive calc for every unit serviced.
-  bundledShopItemId     String?
-  bundledShopItem       ShopItem? @relation("IncentiveRateBundledItem", fields: [bundledShopItemId], references: [id])
-  bundledQuantityPerUnit Decimal  @default(1) @db.Decimal(10, 2)
+  bundledShopItemId      String?
+  bundledShopItem        ShopItem? @relation("IncentiveRateBundledItem", fields: [bundledShopItemId], references: [id])
+  bundledQuantityPerUnit Decimal   @default(1) @db.Decimal(10, 2)
 
   active    Boolean @default(true)
   sortOrder Int     @default(0)
@@ -680,6 +682,7 @@ model SalesReceipt {
   taxTotal      Decimal       @default(0) @db.Decimal(12, 2)
   total         Decimal       @default(0) @db.Decimal(12, 2)
   notes         String?
+  shareToken    String?       @unique // public share link (Session 23)
   createdById   String?
   createdAt     DateTime      @default(now())
 
@@ -785,23 +788,23 @@ model Opportunity {
 // ---------------------------------------------------------------------------
 
 model Employee {
-  id          String    @id @default(cuid())
-  userId      String?   @unique
-  name        String
-  nin         String? // National Identification Number
-  homeAddress String?
-  email       String?
-  phone       String?
-  jobTitle   String?
-  department String?
-  hireDate   DateTime?
-  payType    PayType   @default(MONTHLY)
-  payRate    Decimal?  @db.Decimal(10, 2) // interpreted per payType: MONTHLY = amount/month (standard going forward)
+  id                   String    @id @default(cuid())
+  userId               String?   @unique
+  name                 String
+  nin                  String? // National Identification Number
+  homeAddress          String?
+  email                String?
+  phone                String?
+  jobTitle             String?
+  department           String?
+  hireDate             DateTime?
+  payType              PayType   @default(MONTHLY)
+  payRate              Decimal?  @db.Decimal(10, 2) // interpreted per payType: MONTHLY = amount/month (standard going forward)
   standardHoursPerWeek Decimal?  @default(40) @db.Decimal(5, 2)
   employmentType       String?   @default("Permanent") // Permanent, Contract, Part-Time, Probation
   contractEndDate      DateTime? // for fixed-term / contract employment
-  active     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
+  active               Boolean   @default(true)
+  createdAt            DateTime  @default(now())
 
   timeActivities TimeActivity[]
 
@@ -1088,12 +1091,14 @@ model WorkOrder {
   invoiceNumberIfIssued    String? // technician-entered, free text — the actual Invoice record (if any) is linked separately via invoiceId
   invoiceId                String?         @unique
   invoice                  Invoice?        @relation(fields: [invoiceId], references: [id])
+  certificateNumber        String?         @unique // servicing certificate, issued on demand (Session 23)
+  certificateIssuedAt      DateTime?
   deletedAt                DateTime?
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
 
-  inspectionItems WorkOrderInspectionItem[]
-  historyEntries  WorkOrderHistoryEntry[]
+  inspectionItems       WorkOrderInspectionItem[]
+  historyEntries        WorkOrderHistoryEntry[]
   // Extra technicians beyond the primary assignedTechnicianId (Session 20)
   // -- lets an admin put more than one tech on a job; the incentive the job
   // earns is split equally across everyone on it (primary + additional).
@@ -1351,10 +1356,10 @@ model Payment {
   // configured) or an admin manually confirms it matches the invoice
   // amount -- only then does it count toward the invoice being marked Paid.
   verificationStatus PaymentVerificationStatus @default(NONE)
-  proofPhotoUrl       String? // cheque / transfer-confirmation photo
-  proofNotes           String? // free text the technician or AI pass left (e.g. "cheque # 4471, amount matches")
-  verifiedAt           DateTime?
-  verifiedById         String? // null when confirmed automatically by the AI pass rather than a person
+  proofPhotoUrl      String? // cheque / transfer-confirmation photo
+  proofNotes         String? // free text the technician or AI pass left (e.g. "cheque # 4471, amount matches")
+  verifiedAt         DateTime?
+  verifiedById       String? // null when confirmed automatically by the AI pass rather than a person
 
   @@index([invoiceId])
   @@index([bankAccountId])
@@ -1376,24 +1381,24 @@ model AppSettings {
   id Int @id @default(1)
 
   // ---- 1. Company & Account Settings -------------------------------------
-  companyName           String  @default("Ignite Safety")
-  legalName             String?
-  companyAddress        String?
-  companyPhone          String?
-  companyEmail          String?
-  taxRegistrationNumber String? // TIN (Seychelles Revenue Commission)
+  companyName                String  @default("Ignite Safety")
+  legalName                  String?
+  companyAddress             String?
+  companyPhone               String?
+  companyEmail               String?
+  taxRegistrationNumber      String? // TIN (Seychelles Revenue Commission)
   businessRegistrationNumber String? // BRN (Registrar of Companies)
-  registeredOwners       String? // partners/owners as on the Certificate of Registration
-  businessType          String? @default("Limited Company")
-  industry              String? @default("Fire & Life Safety Services")
-  currencyCode          String  @default("SCR")
-  logoUrl               String? // logo used on printed documents/forms (white background)
-  faviconUrl            String? // browser-tab icon (transparent background)
-  invoiceTermsDefault   String? @default("Due on Receipt")
-  paymentInstructions   String? @default("1. Cash\n2. Credit / Debit Card\n3. Cheque\n4. Bank Transfer\n5. Approved PO") // printed on invoice/estimate/receipt footer
-  bankName              String?
-  bankAccountName       String?
-  bankAccountNumber     String?
+  registeredOwners           String? // partners/owners as on the Certificate of Registration
+  businessType               String? @default("Limited Company")
+  industry                   String? @default("Fire & Life Safety Services")
+  currencyCode               String  @default("SCR")
+  logoUrl                    String? // logo used on printed documents/forms (white background)
+  faviconUrl                 String? // browser-tab icon (transparent background)
+  invoiceTermsDefault        String? @default("Due on Receipt")
+  paymentInstructions        String? @default("1. Cash\n2. Credit / Debit Card\n3. Cheque\n4. Bank Transfer\n5. Approved PO") // printed on invoice/estimate/receipt footer
+  bankName                   String?
+  bankAccountName            String?
+  bankAccountNumber          String?
 
   // Usage limits (display-only guardrails, not hard-enforced)
   chartOfAccountsLimit Int?
@@ -1500,7 +1505,7 @@ model AppSettings {
   // The default share of a service's price a technician earns as incentive
   // (e.g. 0.20 = 1/5). Applies to any IncentiveRate row that doesn't set its
   // own fractionOverride/flatAmount.
-  defaultIncentiveFraction Decimal @default(0.20) @db.Decimal(5, 4)
+  defaultIncentiveFraction           Decimal @default(0.20) @db.Decimal(5, 4)
   // Which bank account a technician's on-the-spot Cash/Cheque/Transfer
   // collection (the "Receiving Payment" bridge) is deposited into. Plain id,
   // no Prisma relation — AppSettings is a fixed singleton row (id=1), so a
@@ -1511,6 +1516,8 @@ model AppSettings {
   technicianCollectionsBankAccountId String?
 
   // ---- Tax & Financial Settings --------------------------------------------
+  vatFilingFrequency    String  @default("MONTHLY") // MONTHLY | QUARTERLY (Session 23)
+  vatDueDay             Int     @default(21) // day of the month after the period ends
   defaultTaxRateId      String?
   taxInclusivePricing   Boolean @default(false)
   discountLimitPercent  Decimal @default(20) @db.Decimal(5, 2)
@@ -1530,18 +1537,18 @@ model AppSettings {
 model Expense {
   id            String        @id @default(cuid())
   expenseNumber String?       @unique // e.g. EXP-2026-0001, shown on the printable/downloadable receipt
-  date        DateTime      @default(now())
-  category    String // e.g. "Vehicle Fuel", "Parts & Supplies", "Rent", "Salaries"
-  vendor      String? // free-text vendor name, kept for entries not mapped to a Supplier record
-  description String?
-  amount      Decimal       @db.Decimal(12, 2)
-  method      PaymentMethod @default(BANK_TRANSFER)
-  reference   String?
-  accountId   String? // Chart of Accounts record this expense posts against
-  account     Account?      @relation(fields: [accountId], references: [id])
-  supplierId  String? // optional mapping to an existing Supplier
-  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
-  createdAt   DateTime      @default(now())
+  date          DateTime      @default(now())
+  category      String // e.g. "Vehicle Fuel", "Parts & Supplies", "Rent", "Salaries"
+  vendor        String? // free-text vendor name, kept for entries not mapped to a Supplier record
+  description   String?
+  amount        Decimal       @db.Decimal(12, 2)
+  method        PaymentMethod @default(BANK_TRANSFER)
+  reference     String?
+  accountId     String? // Chart of Accounts record this expense posts against
+  account       Account?      @relation(fields: [accountId], references: [id])
+  supplierId    String? // optional mapping to an existing Supplier
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  createdAt     DateTime      @default(now())
 
   @@index([date])
   @@index([accountId])
@@ -1560,4 +1567,94 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Session 23: historical servicing, VAT returns, scheduled jobs
+// ---------------------------------------------------------------------------
+
+// One row per client per calendar month in which servicing was done
+// ("a customer can have multiple servicing batches in a year, batched in
+// monthly counts"). Built from QuickBooks invoice lines, the 2021 servicing
+// records and the 2023 technician job logs; new completed work orders can
+// add rows too. customerId is null for clients that are not (yet) customers
+// in the app -- they are prospects, shown on Outreach with the name,
+// address and phone captured here.
+model ServicingBatch {
+  id            String    @id @default(cuid())
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  clientName    String
+  address       String?
+  phone         String?
+  batchMonth    DateTime // first day of the month (UTC)
+  serviceDate   DateTime // latest service date seen within the month
+  nextDueDate   DateTime // serviceDate + 12 months
+  extinguishers Int       @default(0)
+  hoseReels     Int       @default(0)
+  fireBlankets  Int       @default(0)
+  detectors     Int       @default(0)
+  otherItems    Int       @default(0)
+  source        String // QUICKBOOKS | PRESAFE_2021 | PRESAFE_2023 | APP
+  sourceRef     String?
+  notes         String?
+  dedupeKey     String    @unique // normalised client name + YYYY-MM
+  createdAt     DateTime  @default(now())
+
+  @@index([customerId])
+  @@index([batchMonth])
+  @@index([nextDueDate])
+  @@map("servicing_batches")
+}
+
+// A VAT return prepared in Tax Center and tracked until paid.
+model VatReturn {
+  id               String    @id @default(cuid())
+  periodStart      DateTime
+  periodEnd        DateTime
+  dueDate          DateTime
+  outputTax        Decimal   @default(0) @db.Decimal(12, 2) // VAT on sales (net of credit notes)
+  inputTax         Decimal   @default(0) @db.Decimal(12, 2) // VAT on purchases
+  outputAdjustment Decimal   @default(0) @db.Decimal(12, 2)
+  inputAdjustment  Decimal   @default(0) @db.Decimal(12, 2)
+  netPayable       Decimal   @default(0) @db.Decimal(12, 2) // output - input (negative = refund)
+  taxableSales     Decimal   @default(0) @db.Decimal(12, 2)
+  totalSales       Decimal   @default(0) @db.Decimal(12, 2)
+  status           String    @default("DRAFT") // DRAFT | FILED | PAID
+  filedAt          DateTime?
+  filedReference   String?
+  paidAt           DateTime?
+  paidAmount       Decimal?  @db.Decimal(12, 2)
+  paymentReference String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([periodStart])
+  @@map("vat_returns")
+}
+
+// Idempotency log for payment reminders: one row per invoice per schedule
+// offset, so a cron that fires twice never emails twice.
+model ReminderLog {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  offsetDays Int
+  sentAt     DateTime @default(now())
+  toEmail    String?
+
+  @@unique([invoiceId, offsetDays])
+  @@map("reminder_logs")
+}
+
+// Audit trail of scheduled-job runs (visible to admins).
+model CronRun {
+  id        String   @id @default(cuid())
+  job       String
+  startedAt DateTime @default(now())
+  ok        Boolean  @default(true)
+  summary   String?
+
+  @@index([job, startedAt])
+  @@map("cron_runs")
 }
