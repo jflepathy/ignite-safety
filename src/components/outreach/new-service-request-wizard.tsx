@@ -34,6 +34,7 @@ export default function NewServiceRequestWizard({
   onClose,
   initialCustomerId,
   initialSourceEquipmentId,
+  initialCounts,
   workshopAddress,
 }: {
   customers: Customer[];
@@ -41,6 +42,8 @@ export default function NewServiceRequestWizard({
   onClose: () => void;
   initialCustomerId?: string;
   initialSourceEquipmentId?: string;
+  /** Pre-fill the equipment counters, e.g. from a client's last servicing batch. */
+  initialCounts?: Record<string, number>;
   /** Company address — Workshop jobs happen here, so the wizard doesn't
    * need to ask for region/district/building for them (Session 12). */
   workshopAddress?: string | null;
@@ -62,7 +65,7 @@ export default function NewServiceRequestWizard({
   const [buildingName, setBuildingName] = useState('');
   const [locationNotes, setLocationNotes] = useState('');
 
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, number>>(initialCounts ?? {});
 
   const [showScheduling, setShowScheduling] = useState(false);
   const [scheduling, setScheduling] = useState(false);

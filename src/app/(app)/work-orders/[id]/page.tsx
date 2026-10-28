@@ -50,6 +50,11 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
               Convert to Draft Invoice
             </Link>
           )}
+          {wo.status === 'COMPLETED' && (
+            <Link href={`/work-orders/${wo.id}/certificate`} className="btn-secondary">
+              {wo.certificateNumber ? `Certificate ${wo.certificateNumber}` : 'Servicing certificate'}
+            </Link>
+          )}
           {wo.invoice && (
             <Link href={`/billing/invoices/${wo.invoice.id}`} className="btn-secondary">
               View Invoice {wo.invoice.invoiceNumber}

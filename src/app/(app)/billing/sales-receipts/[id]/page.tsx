@@ -7,6 +7,9 @@ import InvoiceDocument, { type InvoiceDocumentData } from '@/components/billing/
 import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import { formatDate } from '@/lib/format-date';
+import { ensureShareToken } from '@/lib/share-token';
+import ShareLinkButton from '@/components/shared/share-link-button';
+import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
 
 export default async function SalesReceiptDetailPage({ params }: { params: { id: string } }) {
   const [receipt, settings] = await Promise.all([
@@ -18,6 +21,7 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
   ]);
   if (!receipt) notFound();
   const currency = settings?.currencyCode ?? 'SCR';
+  const shareToken = await ensureShareToken('receipt', receipt.id, receipt.shareToken);
 
   const documentData: InvoiceDocumentData = {
     settings: {
@@ -83,6 +87,15 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
           <Link href={`/billing/sales-receipts/${receipt.id}/edit`} className="btn-secondary">
             Edit
           </Link>
+          <ShareLinkButton path={`/share/receipt/${shareToken}`} />
+          <WhatsAppShareButton
+            phone={receipt.customer.phone}
+            customerName={receipt.customer.displayName}
+            documentLabel="sales receipt"
+            documentNumber={receipt.receiptNumber}
+            companyName={documentData.settings.companyName}
+            path={`/share/receipt/${shareToken}`}
+          />
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={receipt.receiptNumber} />
         </div>

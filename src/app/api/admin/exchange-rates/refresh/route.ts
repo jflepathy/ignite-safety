@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
+import { isCronRequest } from '@/lib/cron-auth';
 
 /**
  * Fetches current exchange rates against the base currency from a free,
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const cronSecret = req.headers.get('authorization');
-  const isCron = process.env.CRON_SECRET && cronSecret === `Bearer ${process.env.CRON_SECRET}`;
+  const isCron = (process.env.CRON_SECRET && cronSecret === `Bearer ${process.env.CRON_SECRET}`) || (await isCronRequest(req));
   if (!isCron) {
     const { error } = await requireRole('ADMIN');
     if (error) return error;

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { canTechnicianAccess } from '@/lib/work-order-status';
 import { logWorkOrderHistory } from '@/lib/work-order-history';
+import { issueCertificate } from '@/lib/certificate';
 import { z } from 'zod';
 
 const ServiceLineSchema = z.object({
@@ -77,6 +78,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     byUserId: session!.user.id,
     byUserName: actorName,
   });
+
+  // Number the servicing certificate straight away (best effort - it can
+  // always be issued later from the work order).
+  try {
+    await issueCertificate(params.id);
+  } catch {
+    /* ignore */
+  }
 
   return NextResponse.json(updated);
 }

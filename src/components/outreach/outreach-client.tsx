@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import NewServiceRequestWizard from './new-service-request-wizard';
 import { EQUIPMENT_CATEGORIES } from '@/lib/equipment-categories';
 import { formatDate } from '@/lib/format-date';
+import ServicingHistory from './servicing-history';
+import type { BatchClient } from '@/lib/servicing-batches';
 
 type Customer = {
   id: string;
@@ -102,6 +104,7 @@ export default function OutreachClient({
   technicians,
   pendingRequests,
   workshopAddress,
+  batchClients = [],
 }: {
   customers: Customer[];
   initialRows: OutreachRow[];
@@ -109,11 +112,13 @@ export default function OutreachClient({
   technicians: Technician[];
   pendingRequests: PendingRequest[];
   workshopAddress?: string | null;
+  batchClients?: BatchClient[];
 }) {
   const router = useRouter();
   const [rows] = useState(initialRows);
   const [filter, setFilter] = useState<'all' | 'overdue' | 'dueSoon' | 'planned'>('all');
-  const [wizard, setWizard] = useState<{ customerId?: string; equipmentId?: string } | null>(null);
+  const [tab, setTab] = useState<'cycle' | 'history'>('cycle');
+  const [wizard, setWizard] = useState<{ customerId?: string; equipmentId?: string; counts?: Record<string, number> } | null>(null);
   const [converting, setConverting] = useState<string | null>(null);
 
   async function convertToWorkOrder(id: string) {
@@ -169,6 +174,38 @@ export default function OutreachClient({
         </button>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-200">
+        {([
+          ['cycle', 'Equipment cycle'],
+          ['history', `Servicing batches (${batchClients.length})`],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === k ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'history' && (
+        <ServicingHistory
+          clients={batchClients}
+          onSchedule={(c) =>
+            setWizard({
+              customerId: c.customerId ?? undefined,
+              counts: {
+                ...(c.latest.extinguishers ? { FIRE_EXTINGUISHER: c.latest.extinguishers } : {}),
+                ...(c.latest.fireBlankets ? { FIRE_BLANKET: c.latest.fireBlankets } : {}),
+                ...(c.latest.hoseReels ? { HOSE_REEL: c.latest.hoseReels } : {}),
+              },
+            })
+          }
+        />
+      )}
+
+      {tab === 'cycle' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button
           onClick={() => setFilter('all')}
@@ -308,12 +345,15 @@ export default function OutreachClient({
         </div>
       )}
 
+      </>)}
+
       {wizard && (
         <NewServiceRequestWizard
           customers={customers}
           technicians={technicians}
           initialCustomerId={wizard.customerId}
           initialSourceEquipmentId={wizard.equipmentId}
+          initialCounts={wizard.counts}
           onClose={() => setWizard(null)}
           workshopAddress={workshopAddress}
         />

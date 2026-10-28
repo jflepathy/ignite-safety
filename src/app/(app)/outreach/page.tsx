@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import { computeOutreachList } from '@/lib/scheduling';
+import { loadBatchClients } from '@/lib/servicing-batches';
 import OutreachClient from '@/components/outreach/outreach-client';
 
 export default async function OutreachPage() {
-  const [rows, customers, scheduledCount, technicians, pendingRequests, settings] = await Promise.all([
+  const [rows, customers, scheduledCount, technicians, pendingRequests, settings, batchClients] = await Promise.all([
     computeOutreachList(),
     prisma.customer.findMany({
       where: { deletedAt: null },
@@ -18,6 +19,7 @@ export default async function OutreachPage() {
       orderBy: { proposedDate: 'asc' },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 }, select: { companyAddress: true } }),
+    loadBatchClients(),
   ]);
 
   const serializedRows = rows.map((r) => ({
@@ -46,6 +48,7 @@ export default async function OutreachPage() {
       technicians={technicians}
       pendingRequests={serializedPending}
       workshopAddress={settings?.companyAddress ?? null}
+      batchClients={batchClients}
     />
   );
 }

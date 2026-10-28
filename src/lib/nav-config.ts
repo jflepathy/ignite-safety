@@ -6,6 +6,7 @@ export type NavGroup = { key: string; label: string; icon: string; items: NavLea
 export const PINNED_NAV: NavLeaf[] = [
   { label: 'Outreach', href: '/outreach', icon: '📣' },
   { label: 'Servicing Requests', href: '/outreach/requests', icon: '🗓️' },
+  { label: 'Equipment', href: '/outreach/equipment', icon: '🧯' },
   { label: 'Work Orders', href: '/work-orders', icon: '🧾' },
 ];
 
@@ -22,6 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // "Invoice & Sales Receipts" tab rather than as two separate lists.
       { label: 'Invoice & Sales Receipts', href: '/billing?tab=documents' },
       { label: 'Customers', href: '/customers' },
+      { label: 'Statements', href: '/billing/statements' },
       { label: 'Products & Services', href: '/admin/catalog' },
       { label: 'Reports', href: '/billing/reports' },
     ],
@@ -98,6 +100,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Company & Account', href: '/admin' },
       { label: 'Lists & Tools', href: '/admin/lists-tools' },
+      { label: 'Scheduled Jobs', href: '/admin/scheduled-jobs' },
       { label: 'Users', href: '/admin/users' },
       { label: 'Recycle Bin', href: '/admin/recycle-bin' },
     ],
@@ -113,7 +116,7 @@ export const CREATE_MENU: CreateGroup[] = [
     items: [
       { label: 'Invoice', href: '/billing/invoices/new' },
       { label: 'Receive payment', href: '/billing/receive-payment' },
-      { label: 'Statement', href: '/customers' },
+      { label: 'Statement', href: '/billing/statements' },
       { label: 'Estimate', href: '/billing/estimates/new' },
       { label: 'Credit note', href: '/billing/credit-notes/new' },
       { label: 'Sales receipt', href: '/billing/sales-receipts/new' },

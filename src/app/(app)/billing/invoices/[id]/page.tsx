@@ -20,6 +20,7 @@ import DeleteRecordButton from '@/components/shared/delete-record-button';
 import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
 import EmailInvoiceButton from '@/components/billing/email-invoice-button';
 import { formatDate } from '@/lib/format-date';
+import { ensureShareToken } from '@/lib/share-token';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
   const [invoice, settings, bankAccounts, session] = await Promise.all([
@@ -47,6 +48,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
   const paymentOptionLabels: Record<string, string> = { card: 'Card', bankTransfer: 'Bank Transfer', cash: 'Cash' };
 
   const currency = settings?.currencyCode ?? 'SCR';
+  const shareToken = await ensureShareToken('invoice', invoice.id, invoice.shareToken);
   const allowedMethods = (settings?.allowedPaymentMethods as string[]) ?? ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'];
 
   // Built once and handed to both InvoiceDocument (screen/print) and
@@ -125,15 +127,15 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
         <div className="flex items-center gap-3">
           <EmailInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} customerEmail={invoice.customer.email} />
-          {invoice.shareToken && <ShareLinkButton path={`/share/invoice/${invoice.shareToken}`} />}
-          {invoice.shareToken && (
+          {shareToken && <ShareLinkButton path={`/share/invoice/${shareToken}`} />}
+          {shareToken && (
             <WhatsAppShareButton
               phone={invoice.customer.phone}
               customerName={invoice.customer.displayName}
               documentLabel="invoice"
               documentNumber={invoice.invoiceNumber}
               companyName={documentData.settings.companyName}
-              path={`/share/invoice/${invoice.shareToken}`}
+              path={`/share/invoice/${shareToken}`}
             />
           )}
           <Link href={`/billing/invoices/new?duplicateFrom=${invoice.id}`} className="btn-secondary">

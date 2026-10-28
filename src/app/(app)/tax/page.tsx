@@ -4,16 +4,19 @@ import { authOptions } from '@/lib/auth';
 import { formatMoney } from '@/lib/money';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import TaxRateActions from '@/components/tax/tax-rate-actions';
+import VatCalendar from '@/components/tax/vat-calendar';
+import { filingPeriods } from '@/lib/vat';
 
-// Tax Center: Tier 2 — tax rates are fully manageable and VAT collected is
-// summed from real invoice data. A full multi-jurisdiction filing workflow
-// (returns, due-date tracking, e-filing) is a Tier 3 "coming soon" item.
+// Tax Center: tax rates, VAT collected, the VAT filing calendar and the log
+// of returns prepared/filed/paid (Session 23). No e-filing: returns are
+// prepared and printed here, then filed with the tax authority by the user.
 export default async function TaxCenterPage() {
-  const [taxRates, invoices, settings, session] = await Promise.all([
+  const [taxRates, invoices, settings, session, returns] = await Promise.all([
     prisma.taxRate.findMany({ orderBy: { name: 'asc' } }),
     prisma.invoice.findMany({ where: { deletedAt: null, status: { notIn: ['DRAFT', 'VOID'] } }, select: { taxTotal: true, issueDate: true } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     getServerSession(authOptions),
+    prisma.vatReturn.findMany({ orderBy: { periodStart: 'desc' } }),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';
   const isAdmin = session?.user.role === 'ADMIN';
@@ -27,7 +30,7 @@ export default async function TaxCenterPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-ink-900">Tax Center</h1>
-        <p className="text-sm text-slate-500">Tax rates and VAT collected from sales. Filing & returns tracking is coming soon.</p>
+        <p className="text-sm text-slate-500">Tax rates, VAT collected, the filing calendar and your VAT returns.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -91,9 +94,31 @@ export default async function TaxCenterPage() {
         </table>
       </div>
 
-      <div className="card border-dashed p-6 text-center text-sm text-slate-400">
-        Tax return preparation, filing deadlines and e-filing integrations are coming soon.
-      </div>
+      <VatCalendar
+        isAdmin={isAdmin}
+        currency={currency}
+        frequency={settings?.vatFilingFrequency ?? 'MONTHLY'}
+        dueDay={settings?.vatDueDay ?? 21}
+        periods={filingPeriods(settings?.vatFilingFrequency ?? 'MONTHLY', settings?.vatDueDay ?? 21).map((p) => ({
+          start: p.start.toISOString().slice(0, 10),
+          end: p.end.toISOString().slice(0, 10),
+          label: p.label,
+          due: p.due.toISOString().slice(0, 10),
+        }))}
+        returns={returns.map((r) => ({
+          id: r.id,
+          start: r.periodStart.toISOString().slice(0, 10),
+          end: r.periodEnd.toISOString().slice(0, 10),
+          due: r.dueDate.toISOString().slice(0, 10),
+          status: r.status,
+          outputTax: Number(r.outputTax) + Number(r.outputAdjustment),
+          inputTax: Number(r.inputTax) + Number(r.inputAdjustment),
+          netPayable: Number(r.netPayable),
+          filedAt: r.filedAt ? r.filedAt.toISOString().slice(0, 10) : null,
+          paidAt: r.paidAt ? r.paidAt.toISOString().slice(0, 10) : null,
+          paidAmount: r.paidAmount != null ? Number(r.paidAmount) : null,
+        }))}
+      />
     </div>
   );
 }

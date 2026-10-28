@@ -97,7 +97,10 @@ export default function CustomersTable({
           <tbody>
             {filtered.map((c) => (
               <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-ink-900">{c.displayName}</td>
+                <td className="px-4 py-3 font-medium text-ink-900">
+                  {c.displayName}
+                  <a href={`/billing/statements?customerId=${c.id}`} className="ml-2 text-xs font-normal text-brand-600 hover:underline">Statement</a>
+                </td>
                 <td className="px-4 py-3 text-slate-500">{c.phone ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{c.region ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{c.district ?? '—'}</td>

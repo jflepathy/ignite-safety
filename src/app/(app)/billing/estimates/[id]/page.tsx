@@ -11,6 +11,9 @@ import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
 import ConvertEstimateButtons from '@/components/billing/convert-estimate-buttons';
 import { formatDate } from '@/lib/format-date';
+import { ensureShareToken } from '@/lib/share-token';
+import ShareLinkButton from '@/components/shared/share-link-button';
+import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
 
 export default async function EstimateDetailPage({ params }: { params: { id: string } }) {
   const [estimate, settings, session] = await Promise.all([
@@ -28,6 +31,7 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
   const isAdmin = session?.user.role === 'ADMIN';
   const canConvert = session?.user.role === 'ADMIN' || session?.user.role === 'SALES';
   const currency = settings?.currencyCode ?? 'SCR';
+  const shareToken = await ensureShareToken('estimate', estimate.id, estimate.shareToken);
 
   const documentData: InvoiceDocumentData = {
     settings: {
@@ -99,6 +103,15 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
               Edit
             </Link>
           )}
+          <ShareLinkButton path={`/share/estimate/${shareToken}`} />
+          <WhatsAppShareButton
+            phone={estimate.customer.phone}
+            customerName={estimate.customer.displayName}
+            documentLabel="estimate"
+            documentNumber={estimate.estimateNumber}
+            companyName={documentData.settings.companyName}
+            path={`/share/estimate/${shareToken}`}
+          />
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={estimate.estimateNumber} />
           {canConvert && estimate.status !== 'CONVERTED' && (
