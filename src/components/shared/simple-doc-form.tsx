@@ -276,7 +276,7 @@ export default function SimpleDocForm({
                   <input
                     type="number"
                     onWheel={(e) => e.currentTarget.blur()}
-                    className="input no-spin text-right"
+                    className="input text-right"
                     value={line.quantity}
                     onChange={(e) => updateLine(line.key, { quantity: parseFloat(e.target.value) || 0 })}
                   />
