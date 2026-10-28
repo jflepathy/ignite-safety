@@ -77,6 +77,9 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
           <Link href="/billing?tab=documents" className="btn-secondary">
             ← Back
           </Link>
+          <Link href={`/billing/sales-receipts/new?duplicateFrom=${receipt.id}`} className="btn-secondary">
+            Duplicate
+          </Link>
           <Link href={`/billing/sales-receipts/${receipt.id}/edit`} className="btn-secondary">
             Edit
           </Link>

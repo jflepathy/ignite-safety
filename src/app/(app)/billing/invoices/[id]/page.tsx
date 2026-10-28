@@ -136,6 +136,9 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
               path={`/share/invoice/${invoice.shareToken}`}
             />
           )}
+          <Link href={`/billing/invoices/new?duplicateFrom=${invoice.id}`} className="btn-secondary">
+            Duplicate
+          </Link>
           <Link href={`/billing/invoices/${invoice.id}/edit`} className="btn-secondary">
             Edit
           </Link>

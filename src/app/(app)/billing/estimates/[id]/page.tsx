@@ -91,6 +91,9 @@ export default async function EstimateDetailPage({ params }: { params: { id: str
           <Link href="/billing?tab=estimates" className="btn-secondary">
             ← Back
           </Link>
+          <Link href={`/billing/estimates/new?duplicateFrom=${estimate.id}`} className="btn-secondary">
+            Duplicate
+          </Link>
           {estimate.status !== 'CONVERTED' && (
             <Link href={`/billing/estimates/${estimate.id}/edit`} className="btn-secondary">
               Edit

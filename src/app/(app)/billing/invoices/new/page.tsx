@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/prisma';
-import InvoiceForm from '@/components/billing/invoice-form';
+import InvoiceForm, { type InvoiceFormInitial } from '@/components/billing/invoice-form';
 import { buildDraftInvoiceLines, type ServiceLine } from '@/lib/incentives';
 
 export default async function NewInvoicePage({
   searchParams,
 }: {
-  searchParams: { workOrderId?: string };
+  searchParams: { workOrderId?: string; duplicateFrom?: string };
 }) {
-  const [customers, shopItems, taxRates, settings, workOrder, incentiveRates] = await Promise.all([
+  const [customers, shopItems, taxRates, settings, workOrder, incentiveRates, source] = await Promise.all([
     prisma.customer.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
     prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.taxRate.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
@@ -16,7 +16,37 @@ export default async function NewInvoicePage({
       ? prisma.workOrder.findUnique({ where: { id: searchParams.workOrderId } })
       : null,
     prisma.incentiveRate.findMany({ where: { active: true } }),
+    searchParams.duplicateFrom
+      ? prisma.invoice.findUnique({ where: { id: searchParams.duplicateFrom }, include: { lineItems: { orderBy: { sortOrder: 'asc' } } } })
+      : null,
   ]);
+
+  // "Duplicate" from an existing invoice: pre-fill a brand-new invoice (new
+  // number, today's date, no payments) with the same customer, terms and lines.
+  // The PO number is left blank because it belongs to the original job.
+  const paymentOptions = (source?.customerPaymentOptions as Record<string, boolean> | null) ?? {};
+  const duplicateInitial: InvoiceFormInitial | undefined = source
+    ? {
+        customerId: source.customerId,
+        dueDate: '',
+        poNumber: '',
+        globalDiscountPercent: Number(source.globalDiscountPercent),
+        terms: source.terms ?? '',
+        notes: source.notes ?? '',
+        customerMessage: source.customerMessage ?? '',
+        taxInclusive: source.taxInclusive,
+        paymentOptions: { card: paymentOptions.card ?? true, bankTransfer: paymentOptions.bankTransfer ?? true, cash: paymentOptions.cash ?? true },
+        lines: source.lineItems.map((li) => ({
+          key: Math.random().toString(36).slice(2),
+          shopItemId: li.shopItemId,
+          description: li.description,
+          quantity: Number(li.quantity),
+          unitPrice: Number(li.unitPrice),
+          discountPercent: Number(li.discountPercent),
+          taxRateId: li.taxRateId,
+        })),
+      }
+    : undefined;
 
   // Auto-populate the draft invoice's line items from the Work Order's
   // recorded serviceLines (Session 16), using the admin-configured
@@ -51,7 +81,9 @@ export default async function NewInvoicePage({
       <div>
         <h1 className="text-2xl font-semibold text-ink-900">New Invoice</h1>
         <p className="text-sm text-slate-500">
-          {workOrder
+          {source
+            ? `Copy of invoice ${source.invoiceNumber} — review the lines and date, then save as a new invoice.`
+            : workOrder
             ? `Billing for completed work order ${workOrder.woNumber}${autoLines.length ? ' — line items auto-filled from the job, review before saving.' : ''}`
             : 'Manually created — nothing is sent until you choose to.'}
         </p>
@@ -82,6 +114,7 @@ export default async function NewInvoicePage({
         defaultTerms={settings?.invoiceTermsDefault ?? undefined}
         workOrderId={workOrder?.id}
         initialLines={autoLines}
+        initial={duplicateInitial}
       />
     </div>
   );
