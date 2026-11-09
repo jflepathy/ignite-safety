@@ -82,6 +82,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
 
+  // After Complete & Sync the sign-off can still be captured if the client has
+  // not signed yet, but an existing signature on a completed job can only be
+  // replaced by an admin (keeps the signed record intact).
+  const signingNow = !!data.customerSignatureDataUrl;
+  const alreadySigned = !!existing.customerSignatureDataUrl;
+  if (existing.status === 'COMPLETED' && signingNow && alreadySigned && session!.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'This work order has already been signed.' }, { status: 409 });
+  }
+
   // Technicians can't reassign a job away from themselves or hand it to
   // someone else — but they CAN claim a job by setting assignedTechnicianId
   // to their own id when it's currently unassigned OR stale (assigned to
@@ -173,6 +182,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       workOrderId: params.id,
       action: 'TECHNICIANS_CHANGED',
       detail,
+      byUserId: session!.user.id,
+      byUserName: actorName,
+    });
+  }
+  if (signingNow && existing.status === 'COMPLETED' && !alreadySigned) {
+    const actorName = session!.user.name ?? session!.user.username ?? 'Someone';
+    await logWorkOrderHistory({
+      workOrderId: params.id,
+      action: 'SIGNED',
+      detail: `${actorName} captured the client signature${data.customerSignedName ? ` (${data.customerSignedName})` : ''} after completion`,
       byUserId: session!.user.id,
       byUserName: actorName,
     });

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignaturePad from './signature-pad';
+import SignAfterComplete from '@/components/work-orders/sign-after-complete';
 import BillingBridgeModal from './billing-bridge-modal';
 import { formatDate } from '@/lib/format-date';
 
@@ -481,6 +482,16 @@ export default function PosClient({
             />
           </div>
 
+          {isCompleted && !signatureDataUrl ? (
+            <SignAfterComplete
+              workOrderId={workOrder.id}
+              initialName={signedName}
+              onSaved={(n, sig) => {
+                setSignedName(n);
+                setSignatureDataUrl(sig);
+              }}
+            />
+          ) : (
           <div className="rounded-xl bg-white p-3 shadow-sm">
             <label className="label">
               Customer Name (for sign-off){(isAdminPreview || !settings.requireCustomerSignoff) && <span className="font-normal normal-case text-slate-400"> — optional</span>}
@@ -514,6 +525,7 @@ export default function PosClient({
               </button>
             )}
           </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

@@ -1,3 +1,4 @@
+import SignAfterComplete from '@/components/work-orders/sign-after-complete';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -104,6 +105,12 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
           />
         </div>
       </div>
+
+      {wo.status === 'COMPLETED' && !wo.customerSignatureDataUrl && (
+        <div className="card p-6">
+          <SignAfterComplete workOrderId={wo.id} initialName={wo.customerSignedName} />
+        </div>
+      )}
 
       {wo.status === 'COMPLETED' && Array.isArray(wo.serviceLines) && (wo.serviceLines as any[]).length > 0 && (
         <div className="card p-6">
