@@ -82,13 +82,34 @@ export default async function TechnicianInvoicePage({ params }: { params: { id: 
           ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-base font-semibold text-ink-900">
-          <span>Total</span>
-          <span>{formatMoney(invoice.total.toString(), currency)}</span>
+        <div className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatMoney(invoice.subtotal.toString(), currency)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Discount</span>
+            <span>-{formatMoney(invoice.discountTotal.toString(), currency)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Tax</span>
+            <span>{formatMoney(invoice.taxTotal.toString(), currency)}</span>
+          </div>
+          <div className="flex justify-between border-t border-slate-100 pt-1 text-base font-semibold text-ink-900">
+            <span>Total</span>
+            <span>{formatMoney(invoice.total.toString(), currency)}</span>
+          </div>
+          {Number(invoice.amountPaid) > 0 && (
+            <div className="flex justify-between">
+              <span>Paid</span>
+              <span>-{formatMoney(invoice.amountPaid.toString(), currency)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-base font-bold text-ink-900">
+            <span>Balance Due</span>
+            <span>{formatMoney(invoice.balanceDue.toString(), currency)}</span>
+          </div>
         </div>
-        {Number(invoice.balanceDue) > 0 && invoice.status !== 'DRAFT' && (
-          <p className="mt-1 text-right text-sm text-amber-600">Balance due: {formatMoney(invoice.balanceDue.toString(), currency)}</p>
-        )}
       </div>
 
       <ShareInvoiceButtons

@@ -21,9 +21,9 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   let y = 14 * MM + 10;
 
   // header
-  pdf.setFont('courier', 'bold').setFontSize(13).setTextColor(...ink);
+  pdf.setFont('courier', 'bold').setFontSize(12).setTextColor(...ink);
   pdf.text(d.settings.companyName, x0, y);
-  pdf.setFont('courier', 'normal').setFontSize(9).setTextColor(...grey);
+  pdf.setFont('courier', 'normal').setFontSize(8).setTextColor(...grey);
   y += 14;
   for (const line of [...(d.settings.companyAddress ?? '').split('\n'), d.settings.companyPhone ?? '', d.settings.companyEmail ?? '']) {
     if (!line.trim()) continue;
@@ -33,17 +33,17 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   y += 10;
   pdf.setDrawColor(...ink).setLineWidth(1.5).line(x0, y, x1, y);
   y += 24;
-  pdf.setFont('courier', 'bold').setFontSize(22).setTextColor(...ink).text('STATEMENT', x0, y);
-  pdf.setFontSize(9).setTextColor(...grey).text('STATEMENT DATE', x1, y - 14, { align: 'right' });
-  pdf.setFontSize(13).setTextColor(...red).text(d.statementDate, x1, y, { align: 'right' });
+  pdf.setFont('courier', 'bold').setFontSize(21).setTextColor(...ink).text('STATEMENT', x0, y);
+  pdf.setFontSize(8).setTextColor(...grey).text('STATEMENT DATE', x1, y - 14, { align: 'right' });
+  pdf.setFontSize(12).setTextColor(...red).text(d.statementDate, x1, y, { align: 'right' });
   y += 26;
 
-  pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...grey).text('STATEMENT TO', x0, y);
+  pdf.setFont('courier', 'bold').setFontSize(7).setTextColor(...grey).text('STATEMENT TO', x0, y);
   pdf.text('AMOUNT DUE', x1, y, { align: 'right' });
   y += 12;
-  pdf.setFont('courier', 'bold').setFontSize(10.5).setTextColor(...ink).text(d.customer.displayName, x0, y);
-  pdf.setFontSize(14).text(m(d.closingBalance), x1, y + 2, { align: 'right' });
-  pdf.setFont('courier', 'normal').setFontSize(9).setTextColor(...grey);
+  pdf.setFont('courier', 'bold').setFontSize(9.5).setTextColor(...ink).text(d.customer.displayName, x0, y);
+  pdf.setFontSize(13).text(m(d.closingBalance), x1, y + 2, { align: 'right' });
+  pdf.setFont('courier', 'normal').setFontSize(8).setTextColor(...grey);
   let ya = y + 11;
   for (const line of [...(d.customer.address ?? '').split('\n'), d.customer.phone ?? '']) {
     if (!line.trim()) continue;
@@ -55,7 +55,7 @@ export function buildStatementPdf(d: StatementData): jsPDF {
 
   const cols = { date: x0, ref: x0 + 56, desc: x0 + 112, chg: x1 - 130, pay: x1 - 66, bal: x1 };
   const head = () => {
-    pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...grey);
+    pdf.setFont('courier', 'bold').setFontSize(7).setTextColor(...grey);
     pdf.text('DATE', cols.date, y);
     pdf.text('REF', cols.ref, y);
     pdf.text('DESCRIPTION', cols.desc, y);
@@ -76,7 +76,7 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   head();
   const row = (date: string, ref: string, desc: string, chg: string, pay: string, bal: string, italic = false) => {
     room(14);
-    pdf.setFont('courier', italic ? 'italic' : 'normal').setFontSize(8.5).setTextColor(...ink);
+    pdf.setFont('courier', italic ? 'italic' : 'normal').setFontSize(7.5).setTextColor(...ink);
     pdf.text(date, cols.date, y);
     pdf.text(ref, cols.ref, y);
     pdf.text(desc.length > 34 ? desc.slice(0, 33) + '…' : desc, cols.desc, y);
@@ -91,13 +91,13 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   for (const l of d.lines) row(l.date, l.ref, l.description, l.charge ? num(l.charge) : '', l.credit ? num(l.credit) : '', num(l.balance));
   if (d.lines.length === 0) {
     room(20);
-    pdf.setFontSize(9).setTextColor(...grey).text('No activity in this period.', x0 + 4, y);
+    pdf.setFontSize(8).setTextColor(...grey).text('No activity in this period.', x0 + 4, y);
     y += 16;
   }
   room(30);
   pdf.setDrawColor(...ink).setLineWidth(1.5).line(x0, y, x1, y);
   y += 13;
-  pdf.setFont('courier', 'bold').setFontSize(9).setTextColor(...ink);
+  pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...ink);
   pdf.text('TOTAL', cols.date, y);
   pdf.text(num(d.totalCharges), cols.chg, y, { align: 'right' });
   pdf.text(num(d.totalCredits), cols.pay, y, { align: 'right' });
@@ -106,11 +106,11 @@ export function buildStatementPdf(d: StatementData): jsPDF {
 
   if (d.openInvoices.length) {
     room(60 + d.openInvoices.length * 12);
-    pdf.setFontSize(8).setTextColor(...grey).text('OPEN INVOICES (TODAY)', x0, y);
+    pdf.setFontSize(7).setTextColor(...grey).text('OPEN INVOICES (TODAY)', x0, y);
     y += 12;
     for (const o of d.openInvoices) {
       room(14);
-      pdf.setFont('courier', 'normal').setFontSize(8.5).setTextColor(...ink);
+      pdf.setFont('courier', 'normal').setFontSize(7.5).setTextColor(...ink);
       pdf.text(o.number, cols.date, y);
       pdf.text(`${o.issueDate}${o.dueDate ? '  due ' + o.dueDate : ''}`, cols.ref, y);
       pdf.text(o.daysOverdue ? `${o.daysOverdue}d overdue` : 'current', cols.chg, y, { align: 'right' });
@@ -130,8 +130,8 @@ export function buildStatementPdf(d: StatementData): jsPDF {
     pdf.setDrawColor(203, 213, 225).setLineWidth(0.5).rect(x0, y, x1 - x0, 32);
     labels.forEach(([lab, v], i) => {
       const cx = x0 + cw * i + cw / 2;
-      pdf.setFont('courier', 'normal').setFontSize(7.5).setTextColor(...grey).text(lab.toUpperCase(), cx, y + 12, { align: 'center' });
-      pdf.setFont('courier', 'bold').setFontSize(9).setTextColor(...ink).text(m(v), cx, y + 25, { align: 'center' });
+      pdf.setFont('courier', 'normal').setFontSize(6.5).setTextColor(...grey).text(lab.toUpperCase(), cx, y + 12, { align: 'center' });
+      pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...ink).text(m(v), cx, y + 25, { align: 'center' });
     });
     y += 48;
   }
@@ -141,9 +141,9 @@ export function buildStatementPdf(d: StatementData): jsPDF {
     room(50);
     pdf.setDrawColor(203, 213, 225).setLineDashPattern([3, 3], 0).line(x0, y, x1, y).setLineDashPattern([], 0);
     y += 14;
-    pdf.setFont('courier', 'bold').setFontSize(8).setTextColor(...grey).text('PAYMENT METHODS', x0, y);
+    pdf.setFont('courier', 'bold').setFontSize(7).setTextColor(...grey).text('PAYMENT METHODS', x0, y);
     y += 12;
-    pdf.setFont('courier', 'normal').setFontSize(9).setTextColor(...ink);
+    pdf.setFont('courier', 'normal').setFontSize(8).setTextColor(...ink);
     if (s.paymentInstructions) {
       for (const ln of pdf.splitTextToSize(s.paymentInstructions, x1 - x0)) {
         room(12);
@@ -158,7 +158,7 @@ export function buildStatementPdf(d: StatementData): jsPDF {
   }
   if (s.taxRegistrationNumber) {
     room(14);
-    pdf.setFontSize(8).setTextColor(...grey).text(`TIN: ${s.taxRegistrationNumber}`, x0, y + 4);
+    pdf.setFontSize(7).setTextColor(...grey).text(`TIN: ${s.taxRegistrationNumber}`, x0, y + 4);
   }
   return pdf;
 }

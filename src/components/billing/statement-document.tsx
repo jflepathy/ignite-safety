@@ -6,7 +6,7 @@ export default function StatementDocument({ data }: { data: StatementData }) {
   const { settings, currency } = data;
   const m = (n: number) => formatMoney(n, currency);
   return (
-    <div className="bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+    <div className="doc-font bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
       <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-white p-8">
         <div>
           <p className="text-lg font-bold tracking-tight">{settings.companyName}</p>

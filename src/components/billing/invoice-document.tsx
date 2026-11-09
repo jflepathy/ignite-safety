@@ -140,7 +140,7 @@ export default function InvoiceDocument({
   const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
 
   return (
-    <div className="bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+    <div className="doc-font bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
       {/* Company header band */}
       <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-white p-8">
         <div>
@@ -263,48 +263,40 @@ export default function InvoiceDocument({
           </div>
 
           <div className="w-full space-y-1 text-sm sm:w-72">
-            {(hasDiscount || Number(taxTotal) > 0 || hasPaid) && (
-              // Subtotal / discount / tax stay screen-only (the plain printed
-              // template shows just the total). When a payment has been
-              // recorded the Total and the payments received DO print, so the
-              // paper copy explains why the amount due is lower than the total.
-              <div className={`space-y-1 ${hasPaid ? '' : 'print:hidden'}`}>
-                <div className="space-y-1 print:hidden">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span>{formatMoney(subtotal, currency)}</span>
-                  </div>
-                  {hasDiscount && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Discount{Number(globalDiscountPercent) > 0 ? ` (${globalDiscountPercent}%)` : ''}</span>
-                      <span>-{formatMoney(discountTotal, currency)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-slate-600">
-                    <span>Tax</span>
-                    <span>{formatMoney(taxTotal, currency)}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-ink-900">
-                  <span>Total</span>
-                  <span>{formatMoney(total, currency)}</span>
-                </div>
-                {hasPaid &&
-                  (payments && payments.length > 0 ? (
-                    payments.map((p, i) => (
-                      <div key={i} className="flex justify-between text-slate-600">
-                        <span>Payment {p.date}</span>
-                        <span>-{formatMoney(p.amount, currency)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Paid</span>
-                      <span>-{formatMoney(amountPaid!, currency)}</span>
-                    </div>
-                  ))}
+            {/* Full breakdown on screen, print and PDF alike: Subtotal,
+                Discount, Tax, Total, any payments received, then Balance Due. */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span>{formatMoney(subtotal, currency)}</span>
               </div>
-            )}
+              <div className="flex justify-between text-slate-600">
+                <span>Discount{Number(globalDiscountPercent) > 0 ? ` (${globalDiscountPercent}%)` : ''}</span>
+                <span>{hasDiscount ? '-' : ''}{formatMoney(discountTotal, currency)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Tax</span>
+                <span>{formatMoney(taxTotal, currency)}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-ink-900">
+                <span>Total</span>
+                <span>{formatMoney(total, currency)}</span>
+              </div>
+              {hasPaid &&
+                (payments && payments.length > 0 ? (
+                  payments.map((p, i) => (
+                    <div key={i} className="flex justify-between text-slate-600">
+                      <span>Payment {p.date}</span>
+                      <span>-{formatMoney(p.amount, currency)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Paid</span>
+                    <span>-{formatMoney(amountPaid!, currency)}</span>
+                  </div>
+                ))}
+            </div>
             <div className="flex items-center justify-between border-t border-slate-200 py-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{totalLabel}</span>
               <span className="text-xl font-bold text-ink-900">{formatMoney(balanceDue, currency)}</span>

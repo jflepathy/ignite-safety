@@ -53,12 +53,13 @@ const MARGIN_SIDE = 12 * MM_TO_PT;
 const PAD = 32 * 0.75; // 24pt
 
 const PX = 0.75; // CSS px -> pt (exact, see Session 22 round 5)
+// Every size is 1pt smaller than the original template (matches .doc-font in globals.css).
 const FS = {
-  xs: 12 * PX, // 9
-  sm: 14 * PX, // 10.5
-  lg: 18 * PX, // 13.5
-  xl: 20 * PX, // 15
-  xxxl: 30 * PX, // 22.5
+  xs: 12 * PX - 1, // 8
+  sm: 14 * PX - 1, // 9.5
+  lg: 18 * PX - 1, // 12.5
+  xl: 20 * PX - 1, // 14
+  xxxl: 30 * PX - 1, // 21.5
 };
 
 type RGB = [number, number, number];
@@ -107,6 +108,10 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     customer,
     lineItems,
     currency,
+    subtotal,
+    discountTotal,
+    globalDiscountPercent,
+    taxTotal,
     total,
     amountPaid,
     payments,
@@ -347,7 +352,7 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
 
   // --- Payment Methods / TIN / Bank Details (left) and Total (right), side by side ---
   // Room for the Payment Methods block plus Total + one line per payment.
-  ensureRoom(90 + (payments?.length ?? 0) * 17);
+  ensureRoom(150 + (payments?.length ?? 0) * 17);
   const footerTop = y;
   const paymentBlockWidth = 220;
   const totalsBlockWidth = 220;
@@ -397,8 +402,17 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
   line(totalsX0, footerTop, contentX1, footerTop, COLOR.slate200, 1);
   let totalsY = footerTop + 16;
   const hasPaid = amountPaid !== undefined && Number(amountPaid) > 0;
+  const hasDiscount = Number(globalDiscountPercent) > 0 || lineItems.some((li) => Number(li.discountPercent) > 0);
+  const rows: { label: string; value: string; bold?: boolean }[] = [
+    { label: 'Subtotal', value: formatMoney(subtotal, currency) },
+    {
+      label: `Discount${Number(globalDiscountPercent) > 0 ? ` (${globalDiscountPercent}%)` : ''}`,
+      value: `${hasDiscount ? '-' : ''}${formatMoney(discountTotal, currency)}`,
+    },
+    { label: 'Tax', value: formatMoney(taxTotal, currency) },
+    { label: 'Total', value: formatMoney(total, currency), bold: true },
+  ];
   if (hasPaid) {
-    const rows: { label: string; value: string; bold?: boolean }[] = [{ label: 'Total', value: formatMoney(total, currency), bold: true }];
     if (payments && payments.length > 0) {
       for (const p of payments) {
         rows.push({ label: `Payment ${p.date}`, value: `-${formatMoney(p.amount, currency)}` });
@@ -406,21 +420,21 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     } else {
       rows.push({ label: 'Paid', value: `-${formatMoney(amountPaid!, currency)}` });
     }
-    pdf.setFontSize(FS.xs);
-    for (const r of rows) {
-      pdf.setFont('courier', r.bold ? 'bold' : 'normal');
-      setColor(r.bold ? COLOR.ink : COLOR.slate600);
-      const valueWidth = pdf.getTextWidth(r.value);
-      const labelMax = totalsBlockWidth - valueWidth - 8;
-      const label = (pdf.splitTextToSize(r.label, labelMax)[0] as string) ?? r.label;
-      pdf.text(label, totalsX0, totalsY + FS.xs);
-      pdf.text(r.value, contentX1, totalsY + FS.xs, { align: 'right' });
-      totalsY += FS.xs + 5;
-    }
-    totalsY += 4;
-    line(totalsX0, totalsY, contentX1, totalsY, COLOR.slate200, 1);
-    totalsY += 10;
   }
+  pdf.setFontSize(FS.xs);
+  for (const r of rows) {
+    pdf.setFont('courier', r.bold ? 'bold' : 'normal');
+    setColor(r.bold ? COLOR.ink : COLOR.slate600);
+    const valueWidth = pdf.getTextWidth(r.value);
+    const labelMax = totalsBlockWidth - valueWidth - 8;
+    const label = (pdf.splitTextToSize(r.label, labelMax)[0] as string) ?? r.label;
+    pdf.text(label, totalsX0, totalsY + FS.xs);
+    pdf.text(r.value, contentX1, totalsY + FS.xs, { align: 'right' });
+    totalsY += FS.xs + 5;
+  }
+  totalsY += 4;
+  line(totalsX0, totalsY, contentX1, totalsY, COLOR.slate200, 1);
+  totalsY += 10;
   pdf.setFont('courier', 'bold');
   pdf.setFontSize(FS.xs);
   setColor(COLOR.slate500);

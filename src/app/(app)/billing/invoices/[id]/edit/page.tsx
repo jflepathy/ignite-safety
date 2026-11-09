@@ -41,6 +41,7 @@ export default async function EditInvoicePage({ params }: { params: { id: string
       taxRateId: li.taxRateId,
     })),
     issueDateForDueCalc: invoice.issueDate.toISOString().slice(0, 10),
+    amountPaid: Number(invoice.amountPaid),
   };
 
   return (

@@ -57,6 +57,8 @@ export type InvoiceFormInitial = {
    * the user changes the Terms preset while editing. Omit on create (today
    * is used instead). */
   issueDateForDueCalc?: string;
+  /** Payments already received (edit only) — used to show Balance Due. */
+  amountPaid?: number;
 };
 
 export default function InvoiceForm({
@@ -613,6 +615,20 @@ export default function InvoiceForm({
               <span>Total</span>
               <span>
                 {totals.total.toFixed(2)} {currency}
+              </span>
+            </div>
+            {(initial?.amountPaid ?? 0) > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Paid</span>
+                <span>
+                  -{(initial?.amountPaid ?? 0).toFixed(2)} {currency}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-bold text-ink-900">
+              <span>Balance Due</span>
+              <span>
+                {Math.max(0, totals.total - (initial?.amountPaid ?? 0)).toFixed(2)} {currency}
               </span>
             </div>
           </div>

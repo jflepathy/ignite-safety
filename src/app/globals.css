@@ -136,3 +136,15 @@
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Printable documents (invoice, estimate, sales receipt, statement,
+   certificate): every Tailwind text size inside is exactly 1pt (1.333px)
+   smaller than its default, on screen, in print and matching the PDFs. */
+.doc-font { font-size: calc(1rem - 1pt); }
+.doc-font .text-xs { font-size: calc(0.75rem - 1pt); }
+.doc-font .text-sm { font-size: calc(0.875rem - 1pt); }
+.doc-font .text-base { font-size: calc(1rem - 1pt); }
+.doc-font .text-lg { font-size: calc(1.125rem - 1pt); }
+.doc-font .text-xl { font-size: calc(1.25rem - 1pt); }
+.doc-font .text-2xl { font-size: calc(1.5rem - 1pt); }
+.doc-font .text-3xl { font-size: calc(1.875rem - 1pt); }

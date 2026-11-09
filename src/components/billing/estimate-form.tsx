@@ -338,11 +338,19 @@ export default function EstimateForm({
               <span>{totals.subtotal.toFixed(2)} {currency}</span>
             </div>
             <div className="flex justify-between text-slate-600">
+              <span>Discount</span>
+              <span>-{totals.discountTotal.toFixed(2)} {currency}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
               <span>Tax</span>
               <span>{totals.taxTotal.toFixed(2)} {currency}</span>
             </div>
-            <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-semibold">
+            <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold">
               <span>Total</span>
+              <span>{totals.total.toFixed(2)} {currency}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-bold">
+              <span>Balance Due</span>
               <span>{totals.total.toFixed(2)} {currency}</span>
             </div>
           </div>

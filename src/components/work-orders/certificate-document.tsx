@@ -4,7 +4,7 @@ import type { CertificateData } from '@/lib/certificate';
 export default function CertificateDocument({ data }: { data: CertificateData }) {
   const s = data.settings;
   return (
-    <div className="bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+    <div className="doc-font bg-white text-ink-900" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
       <div className="flex items-start justify-between gap-6 border-b border-slate-100 bg-white p-8">
         <div>
           <p className="text-lg font-bold tracking-tight">{s.companyName}</p>
