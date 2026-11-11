@@ -61,7 +61,7 @@ export default function EstimateForm({
   const router = useRouter();
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
   const [customerOptions, setCustomerOptions] = useState(customers);
-  const [customerId, setCustomerId] = useState(initial?.customerId ?? customers[0]?.id ?? '');
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
   const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
@@ -139,6 +139,9 @@ export default function EstimateForm({
     setSubmitting(action);
     setError('');
     try {
+      if (!customerId) {
+        throw new Error('Please select a customer before saving.');
+      }
       const filledLines = lines.filter((l) => !isBlankLine(l));
       if (filledLines.length === 0) {
         throw new Error('Add at least one line item before saving.');

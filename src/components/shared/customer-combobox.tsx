@@ -98,7 +98,7 @@ export default function CustomerCombobox({
         className="input flex items-center justify-between text-left"
         onClick={() => setOpen((o) => !o)}
       >
-        <span className={selected ? '' : 'text-slate-400'}>{selected?.name ?? 'Select customer…'}</span>
+        <span className={selected ? '' : 'text-slate-400'}>{selected?.name ?? `Select ${label.toLowerCase()}…`}</span>
         <span className="text-slate-400">▾</span>
       </button>
       {open && (

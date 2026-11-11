@@ -82,7 +82,7 @@ export default function SimpleDocForm({
   initial?: { partyId?: string; lines?: Line[]; extraValues?: Record<string, any> };
 }) {
   const router = useRouter();
-  const [partyId, setPartyId] = useState(initial?.partyId ?? parties[0]?.id ?? '');
+  const [partyId, setPartyId] = useState(initial?.partyId ?? '');
   const [partyOptions, setPartyOptions] = useState(parties);
   const [lines, setLines] = useState<Line[]>(initial?.lines?.length ? initial.lines : [emptyLine()]);
   const [extraValues, setExtraValues] = useState<Record<string, any>>(initial?.extraValues ?? {});
@@ -149,6 +149,11 @@ export default function SimpleDocForm({
     setSubmitting(action);
     setError('');
     try {
+      if (!partyId) {
+        setError(`Please select a ${partyLabel.toLowerCase()} before saving.`);
+        setSubmitting(null);
+        return;
+      }
       const filledLines = lines.filter((l) => !isBlankLine(l));
       if (filledLines.length === 0) {
         setError('Add at least one line item before saving.');
@@ -212,6 +217,7 @@ export default function SimpleDocForm({
             <>
               <label className="label">{partyLabel}</label>
               <select className="input" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+                <option value="">Select {partyLabel.toLowerCase()}…</option>
                 {partyOptions.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}

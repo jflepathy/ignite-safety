@@ -98,7 +98,7 @@ export default function InvoiceForm({
   const defaultTaxRate = taxRates.find((t) => t.isDefault) ?? taxRates[0];
 
   const [customerOptions, setCustomerOptions] = useState(customers);
-  const [customerId, setCustomerId] = useState(initial?.customerId ?? defaultCustomerId ?? customers[0]?.id ?? '');
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? defaultCustomerId ?? '');
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '');
   const [poNumber, setPoNumber] = useState(initial?.poNumber ?? '');
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(initial?.globalDiscountPercent ?? 0);
@@ -297,6 +297,9 @@ export default function InvoiceForm({
     setSubmitting(asStatus);
     setErrorMsg('');
     try {
+      if (!customerId) {
+        throw new Error('Please select a customer before saving.');
+      }
       const filledLines = lines.filter((l) => !isBlankLine(l));
       if (filledLines.length === 0) {
         throw new Error('Add at least one line item before saving.');
