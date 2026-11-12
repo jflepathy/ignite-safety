@@ -18,6 +18,7 @@ export const REGION_DISTRICTS: Record<string, string[]> = {
     'Mont Fleuri',
     'Perseverance',
     'Plaisance',
+    'Providence',
     'Pointe Larue',
     'Port Glaud',
     'Roche Caiman',
