@@ -11,6 +11,10 @@ const ServiceLineSchema = z.object({
   label: z.string(),
   quantity: z.number().int().min(0),
   kind: z.enum(['STANDARD', 'CUSTOM', 'WORKSHOP']),
+  // Write Off F/Ext: the specific extinguishers being written off, and a
+  // human-readable summary of them (serials) kept on the line.
+  equipmentIds: z.array(z.string()).max(100).optional(),
+  note: z.string().max(500).optional(),
 });
 
 // Customer name/signature are validated conditionally below, against the
@@ -78,6 +82,35 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     byUserId: session!.user.id,
     byUserName: actorName,
   });
+
+  // Write Off F/Ext lines: decommission the extinguishers the technician
+  // picked, so they drop out of the equipment cycle / outreach. One update per
+  // unit (the Neon HTTP adapter has no updateMany); only equipment that
+  // belongs to this job's customer and is still active is touched.
+  try {
+    const lines = ((parsed.data.serviceLines ?? (wo.serviceLines as any[])) ?? []) as { key: string; equipmentIds?: string[] }[];
+    const ids = [...new Set(lines.filter((l) => l.key === 'fext_writeoff').flatMap((l) => l.equipmentIds ?? []))].slice(0, 50);
+    if (ids.length > 0) {
+      const found = await prisma.equipment.findMany({
+        where: { id: { in: ids }, customerId: wo.customerId, status: 'ACTIVE', deletedAt: null },
+        select: { id: true, serialNumber: true },
+      });
+      for (const e of found) {
+        await prisma.equipment.update({ where: { id: e.id }, data: { status: 'DECOMMISSIONED' } });
+      }
+      if (found.length > 0) {
+        await logWorkOrderHistory({
+          workOrderId: params.id,
+          action: 'EQUIPMENT_WRITTEN_OFF',
+          detail: `${actorName} wrote off ${found.length} extinguisher${found.length === 1 ? '' : 's'}: ${found.map((e) => e.serialNumber ?? 'no serial').join(', ')}`,
+          byUserId: session!.user.id,
+          byUserName: actorName,
+        });
+      }
+    }
+  } catch {
+    /* best effort - the work order is already completed */
+  }
 
   // Number the servicing certificate straight away (best effort - it can
   // always be issued later from the work order).

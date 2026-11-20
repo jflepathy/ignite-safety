@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function logWorkOrderHistory(params: {
   workOrderId: string;
-  action: 'CREATED' | 'CLAIMED' | 'ASSIGNED' | 'STATUS_CHANGED' | 'COMPLETED' | 'DELETED' | 'TECHNICIANS_CHANGED' | 'SIGNED';
+  action: 'CREATED' | 'CLAIMED' | 'ASSIGNED' | 'STATUS_CHANGED' | 'COMPLETED' | 'DELETED' | 'TECHNICIANS_CHANGED' | 'SIGNED' | 'EQUIPMENT_WRITTEN_OFF';
   detail?: string;
   byUserId?: string | null;
   byUserName?: string | null;

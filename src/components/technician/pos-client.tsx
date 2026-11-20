@@ -7,7 +7,23 @@ import SignAfterComplete from '@/components/work-orders/sign-after-complete';
 import BillingBridgeModal from './billing-bridge-modal';
 import { formatDate } from '@/lib/format-date';
 
-type ServiceLine = { key: string; label: string; quantity: number; kind: 'STANDARD' | 'CUSTOM' | 'WORKSHOP' };
+type ServiceLine = {
+  key: string;
+  label: string;
+  quantity: number;
+  kind: 'STANDARD' | 'CUSTOM' | 'WORKSHOP';
+  /** Write Off F/Ext: the extinguishers written off (decommissioned when the job completes) + a serial summary. */
+  equipmentIds?: string[];
+  note?: string;
+};
+
+export type PosExtinguisher = {
+  id: string;
+  serialNumber: string | null;
+  description: string | null;
+  location: string | null;
+  lastServiceDate: string | null;
+};
 
 type WorkOrder = {
   id: string;
@@ -54,6 +70,9 @@ const WORKSHOP_ACTIONS: { key: string; label: string }[] = [
   // being taken off-site to the workshop instead of serviced here, so the
   // office can see it on the job and follow up (Session 18).
   { key: 'fext_workshop', label: 'Send F/Ext to Workshop' },
+  // Opens a picker of the customer's extinguishers; the chosen ones are
+  // decommissioned when the job is completed.
+  { key: 'fext_writeoff', label: 'Write Off F/Ext' },
 ];
 
 export default function PosClient({
@@ -62,6 +81,7 @@ export default function PosClient({
   backHref = '/technician',
   claimForTechnicianId,
   isAdminPreview = false,
+  extinguishers = [],
 }: {
   workOrder: WorkOrder;
   settings: CompanySettings;
@@ -75,8 +95,13 @@ export default function PosClient({
    * technician could only add/increase, never remove a saved line — see
    * the removed `baselineLines` floor below). */
   isAdminPreview?: boolean;
+  /** The customer's active extinguishers, for the Write Off picker. */
+  extinguishers?: PosExtinguisher[];
 }) {
   const router = useRouter();
+  const [showWriteOff, setShowWriteOff] = useState(false);
+  const [writeOffIds, setWriteOffIds] = useState<string[]>([]);
+  const [writeOffExtra, setWriteOffExtra] = useState(0);
   const [status, setStatus] = useState(workOrder.status);
   const [lines, setLines] = useState<ServiceLine[]>(workOrder.serviceLines ?? []);
   const [customLabel, setCustomLabel] = useState('');
@@ -184,6 +209,31 @@ export default function PosClient({
       if (existing) return prev.map((l) => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l));
       return [...prev, { key, label, quantity: 1, kind }];
     });
+  }
+
+  function openWriteOff() {
+    if (isCompleted) return;
+    const existing = lines.find((l) => l.key === 'fext_writeoff');
+    const ids = existing?.equipmentIds ?? [];
+    setWriteOffIds(ids);
+    setWriteOffExtra(Math.max(0, (existing?.quantity ?? 0) - ids.length));
+    setShowWriteOff(true);
+  }
+
+  function saveWriteOff() {
+    const picked = extinguishers.filter((e) => writeOffIds.includes(e.id));
+    const total = picked.length + writeOffExtra;
+    setShowWriteOff(false);
+    if (total === 0) {
+      setLines((prev) => prev.filter((l) => l.key !== 'fext_writeoff'));
+      return;
+    }
+    const note = [
+      ...picked.map((e) => e.serialNumber ?? e.location ?? 'no serial'),
+      ...(writeOffExtra > 0 ? [`${writeOffExtra} not on file`] : []),
+    ].join(', ');
+    const line: ServiceLine = { key: 'fext_writeoff', label: 'Write Off F/Ext', quantity: total, kind: 'WORKSHOP', equipmentIds: picked.map((e) => e.id), note };
+    setLines((prev) => (prev.some((l) => l.key === 'fext_writeoff') ? prev.map((l) => (l.key === 'fext_writeoff' ? line : l)) : [...prev, line]));
   }
 
   function addCustom() {
@@ -428,8 +478,18 @@ export default function PosClient({
                 <div>
                   <p className="text-sm font-medium text-ink-900">{l.label}</p>
                   <p className="text-xs text-slate-400">{l.kind === 'WORKSHOP' ? 'Workshop action' : l.kind === 'CUSTOM' ? 'Custom' : 'Standard'}</p>
+                  {l.note && <p className="text-xs text-slate-500">{l.note}</p>}
                 </div>
                 <div className="flex items-center gap-2">
+                  {l.key === 'fext_writeoff' ? (
+                    <>
+                      <span className="w-6 text-center text-base font-semibold">{l.quantity}</span>
+                      <button type="button" disabled={isCompleted} className="text-xs text-brand-600 hover:underline disabled:opacity-40" onClick={openWriteOff}>
+                        Edit
+                      </button>
+                    </>
+                  ) : (
+                    <>
                   <button
                     type="button"
                     disabled={isCompleted}
@@ -447,6 +507,8 @@ export default function PosClient({
                   >
                     +
                   </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     disabled={isCompleted}
@@ -593,7 +655,7 @@ export default function PosClient({
                   type="button"
                   disabled={isCompleted}
                   className="flex h-20 flex-col items-center justify-center rounded-xl border-2 border-amber-200 bg-amber-50 text-center text-sm font-semibold text-amber-700 active:scale-95 active:bg-amber-100 disabled:opacity-40"
-                  onClick={() => tapItem(item.key, item.label, 'WORKSHOP')}
+                  onClick={() => (item.key === 'fext_writeoff' ? openWriteOff() : tapItem(item.key, item.label, 'WORKSHOP'))}
                 >
                   {item.label}
                 </button>
@@ -602,6 +664,64 @@ export default function PosClient({
           </div>
         </div>
       </div>
+      )}
+
+      {/* Write Off F/Ext picker */}
+      {showWriteOff && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-xl bg-white shadow-xl sm:rounded-xl">
+            <div className="border-b border-slate-200 p-4">
+              <h2 className="text-lg font-semibold text-ink-900">Write Off F/Ext</h2>
+              <p className="text-xs text-slate-500">
+                Select the extinguishers being written off. They are marked Decommissioned when you Complete &amp; Sync, and drop out of servicing reminders.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
+              {extinguishers.length === 0 && (
+                <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">
+                  No extinguishers on file for this customer. Use the counter below to record units written off.
+                </p>
+              )}
+              {extinguishers.map((e) => {
+                const checked = writeOffIds.includes(e.id);
+                return (
+                  <label key={e.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${checked ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={checked}
+                      onChange={() => setWriteOffIds((prev) => (checked ? prev.filter((x) => x !== e.id) : [...prev, e.id]))}
+                    />
+                    <span>
+                      <span className="font-medium text-ink-900">{e.serialNumber ?? 'No serial'}</span>
+                      {e.description && <span className="text-slate-600"> · {e.description}</span>}
+                      {e.location && <span className="block text-xs text-slate-500">{e.location}</span>}
+                      {e.lastServiceDate && <span className="block text-xs text-slate-400">Last serviced {formatDate(e.lastServiceDate)}</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="space-y-3 border-t border-slate-200 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600">Other units not on file</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300" onClick={() => setWriteOffExtra((n) => Math.max(0, n - 1))}>−</button>
+                  <span className="w-6 text-center font-semibold">{writeOffExtra}</span>
+                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300" onClick={() => setWriteOffExtra((n) => n + 1)}>+</button>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setShowWriteOff(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="btn-primary" onClick={saveWriteOff}>
+                  {writeOffIds.length + writeOffExtra === 0 ? 'Clear write-off' : `Write off ${writeOffIds.length + writeOffExtra}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Claim confirmation — makes claiming a deliberate step rather than

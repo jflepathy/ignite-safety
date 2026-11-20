@@ -126,7 +126,7 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
             <tbody>
               {(wo.serviceLines as any[]).map((l: any) => (
                 <tr key={l.key} className="border-t border-slate-100">
-                  <td className="py-2">{l.label}</td>
+                  <td className="py-2">{l.label}{l.note && <span className="block text-xs text-slate-500">{l.note}</span>}</td>
                   <td className="py-2 text-slate-500">{l.kind}</td>
                   <td className="py-2 text-right">{l.quantity}</td>
                 </tr>

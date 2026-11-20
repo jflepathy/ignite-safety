@@ -25,6 +25,13 @@ export default async function TechnicianJobPage({ params }: { params: { id: stri
     notFound();
   }
 
+  const extinguishers = await prisma.equipment.findMany({
+    where: { customerId: wo.customerId, category: 'FIRE_EXTINGUISHER', status: 'ACTIVE', deletedAt: null },
+    select: { id: true, serialNumber: true, make: true, model: true, locationDescription: true, lastServiceDate: true },
+    orderBy: [{ locationDescription: 'asc' }, { serialNumber: 'asc' }],
+    take: 300,
+  });
+
   const isAdminPreview = session!.user.role === 'ADMIN';
   const claimForTechnicianId =
     session!.user.role === 'TECHNICIAN' && (wo.assignedTechnicianId === null || stale) && wo.assignedTechnicianId !== session!.user.id
@@ -36,6 +43,13 @@ export default async function TechnicianJobPage({ params }: { params: { id: stri
       backHref={isAdminPreview ? '/work-orders' : '/technician'}
       claimForTechnicianId={claimForTechnicianId}
       isAdminPreview={isAdminPreview}
+      extinguishers={extinguishers.map((e) => ({
+        id: e.id,
+        serialNumber: e.serialNumber,
+        description: [e.make, e.model].filter(Boolean).join(' ') || null,
+        location: e.locationDescription,
+        lastServiceDate: e.lastServiceDate ? e.lastServiceDate.toISOString() : null,
+      }))}
       workOrder={{
         id: wo.id,
         woNumber: wo.woNumber,

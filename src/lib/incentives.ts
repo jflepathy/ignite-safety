@@ -79,6 +79,8 @@ export function buildDraftInvoiceLines(
 ): DraftInvoiceLine[] {
   const out: DraftInvoiceLine[] = [];
   for (const line of serviceLines) {
+    // Writing off an extinguisher is not a billable service.
+    if (line.key === 'fext_writeoff') continue;
     const rate = resolveRate(line, ratesByKey);
     const shopItem = rate?.shopItemId ? shopItemsById.get(rate.shopItemId) : undefined;
     out.push({

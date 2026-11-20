@@ -41,6 +41,10 @@ const ServiceLineSchema = z.object({
   label: z.string(),
   quantity: z.number().int().min(0),
   kind: z.enum(['STANDARD', 'CUSTOM', 'WORKSHOP']),
+  // Write Off F/Ext: the specific extinguishers being written off, and a
+  // human-readable summary of them (serials) kept on the line.
+  equipmentIds: z.array(z.string()).max(100).optional(),
+  note: z.string().max(500).optional(),
 });
 
 const UpdateSchema = z.object({
