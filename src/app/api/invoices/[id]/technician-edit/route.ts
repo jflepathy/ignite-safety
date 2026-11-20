@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/api-auth';
 import { canTechnicianAccess } from '@/lib/work-order-status';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
 
 // Lets a technician adjust the line items on the DRAFT invoice the billing
 // bridge auto-raised from their Work Order, before they share it or collect
@@ -102,5 +103,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     where: { id: params.id },
     include: { lineItems: true, customer: true },
   });
+  await syncLedger([{ type: 'INVOICE', id: params.id }]);
   return NextResponse.json(updated);
 }

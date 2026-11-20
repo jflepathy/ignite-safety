@@ -9,6 +9,7 @@ export default function SalesReceiptFormClient({
   shopItems,
   taxRates,
   currency,
+  bankAccounts = [],
   mode = 'create',
   recordId,
   initial,
@@ -17,6 +18,8 @@ export default function SalesReceiptFormClient({
   shopItems: ShopItemOption[];
   taxRates: TaxRateOption[];
   currency: string;
+  /** Bank / cash accounts the money can go into; empty choice = Undeposited Funds. */
+  bankAccounts?: { id: string; name: string }[];
   mode?: 'create' | 'edit';
   recordId?: string;
   initial?: {
@@ -43,18 +46,31 @@ export default function SalesReceiptFormClient({
       recordId={recordId}
       initial={initial}
       extraFields={({ values, set }) => (
-        <div>
-          <label className="label">Payment Method</label>
-          <select className="input" value={values.paymentMethod ?? 'CASH'} onChange={(e) => set('paymentMethod', e.target.value)}>
-            {METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <div>
+            <label className="label">Payment Method</label>
+            <select className="input" value={values.paymentMethod ?? 'CASH'} onChange={(e) => set('paymentMethod', e.target.value)}>
+              {METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Deposit to</label>
+            <select className="input" value={values.bankAccountId ?? ''} onChange={(e) => set('bankAccountId', e.target.value)}>
+              <option value="">Undeposited Funds (bank it later)</option>
+              {bankAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
       )}
-      buildExtraPayload={(v) => ({ paymentMethod: v.paymentMethod || 'CASH' })}
+      buildExtraPayload={(v) => ({ paymentMethod: v.paymentMethod || 'CASH', bankAccountId: v.bankAccountId || null })}
       submitLabel="Save Sales Receipt"
     />
   );

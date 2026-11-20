@@ -15,18 +15,20 @@ function toDateInput(d: Date) {
 }
 
 export default async function ExpensesPage() {
-  const [expenses, settings, accounts, suppliers, session] = await Promise.all([
-    prisma.expense.findMany({ orderBy: { date: 'desc' }, take: 200, include: { account: true, supplier: true } }),
+  const [expenses, settings, accounts, suppliers, session, banks] = await Promise.all([
+    prisma.expense.findMany({ orderBy: { date: 'desc' }, take: 200, include: { account: true, supplier: true, bankAccount: true } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.account.findMany({ where: { type: 'EXPENSE', isActive: true }, orderBy: { name: 'asc' } }),
     prisma.supplier.findMany({ where: { deletedAt: null, active: true }, orderBy: { displayName: 'asc' } }),
     getServerSession(authOptions),
+    prisma.bankAccount.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const isAdmin = session?.user.role === 'ADMIN';
   const canEdit = canEditModule('expenseTransactions', isAdmin, session?.user.editModules);
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.code ? `${a.code} — ${a.name}` : a.name }));
+  const bankOptions = banks.map((b) => ({ value: b.id, label: b.name }));
   const supplierOptions = [{ value: '', label: '— No supplier —' }, ...suppliers.map((s) => ({ value: s.id, label: s.displayName }))];
 
   return (
@@ -53,6 +55,7 @@ export default async function ExpensesPage() {
               options: METHODS.map((m) => ({ value: m, label: m.replace('_', ' ') })),
               defaultValue: 'BANK_TRANSFER',
             },
+            { key: 'bankAccountId', label: 'Paid from', required: true, type: 'select', options: bankOptions },
             { key: 'date', label: 'Date', type: 'date' },
             { key: 'reference', label: 'Reference #' },
           ]}
@@ -74,6 +77,7 @@ export default async function ExpensesPage() {
               <th className="px-4 py-3">Supplier / Vendor</th>
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Method</th>
+              <th className="px-4 py-3">Paid from</th>
               <th className="px-4 py-3 text-right">Amount</th>
               <th className="px-4 py-3"></th>
               {canEdit && <th className="px-4 py-3"></th>}
@@ -88,6 +92,7 @@ export default async function ExpensesPage() {
                 <td className="px-4 py-3 text-slate-500">{e.supplier?.displayName ?? e.vendor ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.description ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{e.method.replace('_', ' ')}</td>
+                <td className="px-4 py-3 text-slate-500">{e.bankAccount?.name ?? <span className="text-amber-600">Not set</span>}</td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(e.amount.toString(), currency)}</td>
                 <td className="px-4 py-3 text-right">
                   {e.expenseNumber && (
@@ -117,6 +122,7 @@ export default async function ExpensesPage() {
                         description: e.description ?? '',
                         amount: Number(e.amount),
                         method: e.method,
+                        bankAccountId: e.bankAccountId ?? '',
                         date: toDateInput(e.date),
                         reference: e.reference ?? '',
                       }}
@@ -132,6 +138,7 @@ export default async function ExpensesPage() {
                           type: 'select',
                           options: METHODS.map((m) => ({ value: m, label: m.replace('_', ' ') })),
                         },
+                        { key: 'bankAccountId', label: 'Paid from', type: 'select', options: bankOptions },
                         { key: 'date', label: 'Date', type: 'date' },
                         { key: 'reference', label: 'Reference #' },
                       ]}

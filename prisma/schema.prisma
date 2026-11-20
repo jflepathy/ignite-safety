@@ -574,6 +574,8 @@ model SupplierPayment {
   reference   String?
   paidAt      DateTime      @default(now())
   createdById String?
+  bankAccountId String? // account the bill was paid from
+  bankAccount   BankAccount? @relation("SupplierPaymentBank", fields: [bankAccountId], references: [id])
 
   @@map("supplier_payments")
 }
@@ -684,6 +686,10 @@ model SalesReceipt {
   notes         String?
   shareToken    String?       @unique // public share link (Session 23)
   createdById   String?
+  // Where the money went: a bank / cash account, or null = Undeposited Funds
+  // (moved to the bank later with a Deposit). Ledger plan, Nov 2026.
+  bankAccountId String?
+  bankAccount   BankAccount?  @relation("SalesReceiptBank", fields: [bankAccountId], references: [id])
   createdAt     DateTime      @default(now())
 
   lineItems SalesReceiptLineItem[]
@@ -720,6 +726,8 @@ model RefundReceipt {
   taxTotal     Decimal       @default(0) @db.Decimal(12, 2)
   total        Decimal       @default(0) @db.Decimal(12, 2)
   createdById  String?
+  bankAccountId String? // account the refund was paid from
+  bankAccount   BankAccount?  @relation("RefundReceiptBank", fields: [bankAccountId], references: [id])
   createdAt    DateTime      @default(now())
 
   lineItems RefundReceiptLineItem[]
@@ -847,6 +855,10 @@ model BankAccount {
   transactions BankTransaction[]
   deposits     Deposit[]
   payments     Payment[]
+  salesReceipts    SalesReceipt[]    @relation("SalesReceiptBank")
+  refundReceipts   RefundReceipt[]   @relation("RefundReceiptBank")
+  expenses         Expense[]         @relation("ExpenseBank")
+  supplierPayments SupplierPayment[] @relation("SupplierPaymentBank")
 
   @@map("bank_accounts")
 }
@@ -875,6 +887,7 @@ model Deposit {
   amount        Decimal     @db.Decimal(12, 2)
   memo          String?
   paymentIds    Json? // ids of Payment rows grouped into this deposit
+  receiptIds    Json? // ids of SalesReceipt rows grouped into this deposit
   createdById   String?
   createdAt     DateTime    @default(now())
 
@@ -902,10 +915,16 @@ model JournalEntry {
   date        DateTime @default(now())
   memo        String?
   createdById String?
+  // Auto-posted entries carry the document they came from (one entry per
+  // document, replaced on every re-post). Manual entries leave these null.
+  sourceType  String?
+  sourceId    String?
   createdAt   DateTime @default(now())
 
   lines JournalLine[]
 
+  @@unique([sourceType, sourceId])
+  @@index([date])
   @@map("journal_entries")
 }
 
@@ -919,6 +938,8 @@ model JournalLine {
   credit         Decimal      @default(0) @db.Decimal(12, 2)
   description    String?
 
+  @@index([accountId])
+  @@index([journalEntryId])
   @@map("journal_lines")
 }
 
@@ -1199,6 +1220,7 @@ model Invoice {
   taxTotal               Decimal       @default(0) @db.Decimal(12, 2)
   total                  Decimal       @default(0) @db.Decimal(12, 2)
   amountPaid             Decimal       @default(0) @db.Decimal(12, 2)
+  creditApplied          Decimal       @default(0) @db.Decimal(12, 2) // credit notes applied to this invoice
   balanceDue             Decimal       @default(0) @db.Decimal(12, 2)
   terms                  String?
   notes                  String? // internal notes
@@ -1445,6 +1467,7 @@ model AppSettings {
 
   // Advanced & Financial Preferences
   accountingMethod             AccountingMethod @default(ACCRUAL)
+  booksClosedThrough           DateTime? // period lock: nothing dated on/before this can be added or changed
   fiscalYearStartMonth         Int              @default(1)
   taxYearStartMonth            Int              @default(1)
   booksClosedDate              DateTime?
@@ -1548,6 +1571,8 @@ model Expense {
   account       Account?      @relation(fields: [accountId], references: [id])
   supplierId    String? // optional mapping to an existing Supplier
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  bankAccountId String? // account the expense was paid from
+  bankAccount   BankAccount?  @relation("ExpenseBank", fields: [bankAccountId], references: [id])
   createdAt     DateTime      @default(now())
 
   @@index([date])

@@ -13,17 +13,23 @@ export async function GET(req: NextRequest) {
     ...(to ? { lte: new Date(to) } : {}),
   };
 
-  const [payments, expenses] = await Promise.all([
+  const has = Object.keys(dateFilter).length > 0;
+  const [payments, expenses, receipts, refunds] = await Promise.all([
     prisma.payment.findMany({
-      where: Object.keys(dateFilter).length ? { paidAt: dateFilter } : {},
+      where: { verificationStatus: { in: ['NONE', 'CONFIRMED'] }, ...(has ? { paidAt: dateFilter } : {}) },
       select: { amount: true, paidAt: true, method: true },
     }),
     prisma.expense.findMany({
-      where: Object.keys(dateFilter).length ? { date: dateFilter } : {},
+      where: has ? { date: dateFilter } : {},
     }),
+    prisma.salesReceipt.findMany({ where: has ? { saleDate: dateFilter } : {}, select: { total: true } }),
+    prisma.refundReceipt.findMany({ where: has ? { refundDate: dateFilter } : {}, select: { total: true } }),
   ]);
 
-  const income = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const income =
+    payments.reduce((s, p) => s + Number(p.amount), 0) +
+    receipts.reduce((s, r) => s + Number(r.total), 0) -
+    refunds.reduce((s, r) => s + Number(r.total), 0);
   const expenseTotal = expenses.reduce((s, e) => s + Number(e.amount), 0);
 
   const byCategory: Record<string, number> = {};

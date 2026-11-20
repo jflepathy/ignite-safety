@@ -15,7 +15,9 @@ export default async function NewCreditNotePage({ searchParams }: { searchParams
       <div>
         <h1 className="text-2xl font-semibold text-ink-900">New Credit Note</h1>
         <p className="text-sm text-slate-500">
-          {invoice ? `Crediting invoice ${invoice.invoiceNumber}` : 'Issue a credit against a customer’s account.'}
+          {invoice
+            ? `Crediting invoice ${invoice.invoiceNumber} — the credit is applied to its balance.`
+            : 'Issue a credit against a customer’s account.'}
         </p>
       </div>
       <CreditNoteFormClient
@@ -24,6 +26,7 @@ export default async function NewCreditNotePage({ searchParams }: { searchParams
         taxRates={taxRates.map((t) => ({ id: t.id, name: t.name, ratePercent: t.ratePercent.toString() }))}
         currency={settings?.currencyCode ?? 'SCR'}
         invoiceId={invoice?.id}
+        initialPartyId={invoice?.customerId}
       />
     </div>
   );

@@ -2,10 +2,11 @@ import { prisma } from '@/lib/prisma';
 import RefundReceiptFormClient from '@/components/billing/refund-receipt-form-client';
 
 export default async function NewRefundReceiptPage() {
-  const [customers, shopItems, settings] = await Promise.all([
+  const [customers, shopItems, settings, bankAccounts] = await Promise.all([
     prisma.customer.findMany({ where: { deletedAt: null }, orderBy: { displayName: 'asc' } }),
     prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    prisma.bankAccount.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
 
   return (
@@ -18,6 +19,7 @@ export default async function NewRefundReceiptPage() {
         customers={customers.map((c) => ({ id: c.id, name: c.displayName }))}
         shopItems={shopItems.map((s) => ({ id: s.id, sku: s.sku, name: s.name, unitPrice: s.unitPrice.toString() }))}
         currency={settings?.currencyCode ?? 'SCR'}
+        bankAccounts={bankAccounts}
       />
     </div>
   );

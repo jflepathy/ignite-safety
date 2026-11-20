@@ -8,12 +8,14 @@ export default function CreditNoteFormClient({
   taxRates,
   currency,
   invoiceId,
+  initialPartyId,
 }: {
   customers: PartyOption[];
   shopItems: ShopItemOption[];
   taxRates: TaxRateOption[];
   currency: string;
   invoiceId?: string;
+  initialPartyId?: string;
 }) {
   return (
     <SimpleDocForm
@@ -32,6 +34,7 @@ export default function CreditNoteFormClient({
         </div>
       )}
       buildExtraPayload={(v) => ({ reason: v.reason || undefined, invoiceId })}
+      initial={initialPartyId ? { partyId: initialPartyId } : undefined}
       submitLabel="Save Credit Note"
     />
   );

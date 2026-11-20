@@ -4,6 +4,9 @@ import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
+import { recomputeInvoiceBalance } from '@/lib/invoice-balance';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -48,6 +51,13 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const locked = await closedPeriodResponse(new Date());
+  if (locked) return locked;
+  if (data.invoiceId) {
+    const inv = await prisma.invoice.findUnique({ where: { id: data.invoiceId }, select: { customerId: true, deletedAt: true } });
+    if (!inv || inv.deletedAt) return NextResponse.json({ error: { formErrors: ['That invoice no longer exists.'] } }, { status: 400 });
+    if (inv.customerId !== data.customerId) return NextResponse.json({ error: { formErrors: ['The credit note customer must match the invoice customer.'] } }, { status: 400 });
+  }
 
   const totals = computeDocumentTotals(data.lineItems, 0);
   const creditNoteNumber = await nextDocumentNumber('creditNoteNextSeq', 'creditNotePrefix');
@@ -91,5 +101,8 @@ export async function POST(req: NextRequest) {
     include: { lineItems: true, customer: true },
   });
 
+  // A credit note raised against an invoice reduces that invoice's balance.
+  if (data.invoiceId) await recomputeInvoiceBalance(data.invoiceId);
+  await syncLedger([{ type: 'CREDIT_NOTE', id: createdNote.id }]);
   return NextResponse.json(note ?? createdNote, { status: 201 });
 }

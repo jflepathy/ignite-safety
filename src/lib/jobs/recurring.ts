@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/prisma';
+import { syncLedger } from '@/lib/ledger';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
@@ -85,6 +86,7 @@ export async function runRecurringInvoices(opts: { dryRun: boolean }): Promise<J
       await prisma.recurringTemplate.update({ where: { id: t.id }, data: { nextRunDate: next } });
       await prisma.auditLog.create({ data: { userId: t.createdById, action: 'INVOICE_CREATED', entityType: 'Invoice', entityId: inv.id, metadata: { invoiceNumber, recurring: t.id, total: totals.total } } });
       made++;
+      await syncLedger([{ type: 'INVOICE', id: inv.id }]);
       items.push(`CREATED ${invoiceNumber} from "${t.name}"`);
     } catch (e: any) {
       failed++;

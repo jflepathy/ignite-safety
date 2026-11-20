@@ -6,6 +6,7 @@ import { runPaymentReminders } from '@/lib/jobs/reminders';
 import { runRecurringInvoices } from '@/lib/jobs/recurring';
 import { runServiceDueNotices } from '@/lib/jobs/service-due';
 import type { JobResult } from '@/lib/jobs/types';
+import { rebuildLedgerTypes, REBUILD_PARTS } from '@/lib/ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,15 @@ async function handle(req: NextRequest, { params }: { params: { job: string } })
     if (job === 'reminders') result = await runPaymentReminders({ dryRun, origin });
     else if (job === 'recurring') result = await runRecurringInvoices({ dryRun });
     else if (job === 'service-due') result = await runServiceDueNotices({ dryRun });
-    else return NextResponse.json({ error: 'Unknown job' }, { status: 404 });
+    else if (job === 'ledger') {
+      // Nightly safety net: re-post every document from scratch, in 3 parts.
+      const part = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get('part') ?? '1', 10) || 1, 1), REBUILD_PARTS.length);
+      if (dryRun) result = { ok: true, summary: `Would rebuild ${REBUILD_PARTS[part - 1].join(', ')}`, items: [], more: false };
+      else {
+        const r = await rebuildLedgerTypes(REBUILD_PARTS[part - 1]);
+        result = { ok: true, summary: `Ledger part ${part}: ${r.map((x) => `${x.type} ${x.entries}`).join(', ')}`, items: [], more: false };
+      }
+    } else return NextResponse.json({ error: 'Unknown job' }, { status: 404 });
   } catch (e: any) {
     result = { ok: false, summary: `Job crashed: ${e?.message ?? e}`, items: [], more: false };
   }

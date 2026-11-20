@@ -5,10 +5,12 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
 import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 const BodySchema = z.object({
   paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).default('CASH'),
+  bankAccountId: z.string().optional().nullable(),
 });
 
 // Session 22, round 15 — the sibling of convert/route.ts (Estimate →
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       receiptNumber,
       customerId: estimate.customerId,
       paymentMethod: parsed.data.paymentMethod,
+      bankAccountId: parsed.data.bankAccountId || null,
       subtotal: totals.subtotal,
       taxTotal: totals.taxTotal,
       total: totals.total,
@@ -95,5 +98,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { lineItems: true, customer: true },
   });
 
+  await syncLedger([{ type: 'SALES_RECEIPT', id: createdReceipt.id }]);
   return NextResponse.json(receipt ?? createdReceipt, { status: 201 });
 }

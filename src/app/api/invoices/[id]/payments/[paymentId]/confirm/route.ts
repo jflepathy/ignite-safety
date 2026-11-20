@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
+import { recomputeInvoiceBalance } from '@/lib/invoice-balance';
+
 
 // Admin manual fallback for a technician-collected cheque/transfer payment
 // that's sitting at PENDING_REVIEW (no GEMINI_API_KEY configured yet, or
@@ -26,33 +30,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string;
     where: { id: payment.id },
     data: { verificationStatus: 'CONFIRMED', verifiedAt: new Date(), verifiedById: session!.user.id },
   });
-  await prisma.bankAccount.update({ where: { id: payment.bankAccountId }, data: { currentBalance: { increment: payment.amount } } });
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: true } });
-  if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const totalPaid = invoice.payments
-    .map((p) => (p.id === payment.id ? { ...p, verificationStatus: 'CONFIRMED' as const } : p))
-    .filter((p) => p.verificationStatus !== 'PENDING_REVIEW' && p.verificationStatus !== 'MISMATCH')
-    .reduce((s, p) => s + Number(p.amount), 0);
-  const total = Number(invoice.total);
-  const balanceDue = Math.max(total - totalPaid, 0);
-  let status: 'PARTIAL' | 'PAID' | 'SENT' = invoice.status as any;
-  if (balanceDue <= 0) status = 'PAID';
-  else if (totalPaid > 0) status = 'PARTIAL';
-
-  // Plain update, no include -- combining a data write with an include in
-  // one call is the same Neon HTTP adapter transaction limitation found
-  // repeatedly elsewhere in this app (Sessions 8/12/14). This was the
-  // actual bug behind "confirming a payment doesn't update the invoice":
-  // the payment.update and bankAccount.update above committed fine, but
-  // this final call threw ("Transactions are not supported in HTTP
-  // mode"), leaving the payment marked Confirmed while the invoice's own
-  // status/balance silently never changed (Session 19).
-  await prisma.invoice.update({
-    where: { id: params.id },
-    data: { amountPaid: totalPaid, balanceDue, status },
-  });
+  await recomputeInvoiceBalance(params.id);
+  await syncLedger([{ type: 'PAYMENT', id: payment.id }]);
 
   const updated = await prisma.invoice.findUnique({
     where: { id: params.id },

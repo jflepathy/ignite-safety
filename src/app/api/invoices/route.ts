@@ -6,6 +6,9 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
+
 import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET(req: NextRequest) {
@@ -78,6 +81,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const data = parsed.data;
+  const locked = await closedPeriodResponse(data.issueDate ? new Date(data.issueDate) : new Date());
+  if (locked) return locked;
 
   const totals = computeDocumentTotals(
     data.lineItems.map((li) => ({
@@ -206,5 +211,6 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await syncLedger([{ type: 'INVOICE', id: createdInvoice.id }]);
   return NextResponse.json(invoice ?? createdInvoice, { status: 201 });
 }

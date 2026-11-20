@@ -4,6 +4,8 @@ import { requireRole } from '@/lib/api-auth';
 import { canTechnicianAccess } from '@/lib/work-order-status';
 import { verifyPaymentPhoto } from '@/lib/payment-verification';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { recomputeInvoiceBalance } from '@/lib/invoice-balance';
 
 // The technician billing-bridge's "Receiving Payment" step (Session 16) —
 // deliberately separate from POST /api/invoices/[id]/payments (which stays
@@ -122,20 +124,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const countsNow = verificationStatus === 'CONFIRMED';
   let updatedInvoice = invoice;
   if (countsNow) {
-    await prisma.bankAccount.update({ where: { id: bankAccountId }, data: { currentBalance: { increment: data.amount } } });
-    // Every prior payment counts unless it's still awaiting/failed proof
-    // review (PENDING_REVIEW / MISMATCH) — a normal office-recorded
-    // payment (verificationStatus: NONE) always counts, same as before
-    // this feature existed.
-    const totalPaid = [...invoice.payments, payment]
-      .filter((p) => p.verificationStatus !== 'PENDING_REVIEW' && p.verificationStatus !== 'MISMATCH')
-      .reduce((s, p) => s + Number(p.amount), 0);
-    const total = Number(invoice.total);
-    const balanceDue = Math.max(total - totalPaid, 0);
-    let status: 'PARTIAL' | 'PAID' | 'SENT' = invoice.status as any;
-    if (balanceDue <= 0) status = 'PAID';
-    else if (totalPaid > 0) status = 'PARTIAL';
-    await prisma.invoice.update({ where: { id: invoice.id }, data: { amountPaid: totalPaid, balanceDue, status } });
+    if (invoice.status === 'DRAFT') await prisma.invoice.update({ where: { id: invoice.id }, data: { status: 'SENT' } });
+    await recomputeInvoiceBalance(invoice.id);
+    await syncLedger([
+      { type: 'INVOICE', id: invoice.id },
+      { type: 'PAYMENT', id: payment.id },
+    ]);
   }
   updatedInvoice = (await prisma.invoice.findUnique({ where: { id: invoice.id }, include: { payments: true, customer: true, lineItems: true } })) as any;
 

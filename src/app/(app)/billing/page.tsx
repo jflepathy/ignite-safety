@@ -66,7 +66,11 @@ export default async function BillingPage({
     take: 30,
   });
 
-  const outstanding = invoices.reduce((s, i) => s + Number(i.balanceDue), 0);
+  const outstandingAgg = await prisma.invoice.aggregate({
+    _sum: { balanceDue: true },
+    where: { deletedAt: null, status: { notIn: ['DRAFT', 'VOID'] } },
+  });
+  const outstanding = Number(outstandingAgg._sum.balanceDue ?? 0);
   const overdueCount = invoices.filter((i) => i.status === 'OVERDUE').length;
   // Collected this month = invoice payments received this month PLUS sales
   // receipts raised this month (a sales receipt is a sale paid on the spot, so

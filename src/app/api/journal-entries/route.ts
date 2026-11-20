@@ -3,11 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { z } from 'zod';
+import { refreshBankBalances } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
   if (error) return error;
   const entries = await prisma.journalEntry.findMany({
+    where: { sourceType: null },
     include: { lines: { include: { account: true } } },
     orderBy: { date: 'desc' },
   });
@@ -34,6 +37,8 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const locked = await closedPeriodResponse(data.date ? new Date(data.date) : new Date());
+  if (locked) return locked;
 
   const totalDebit = Math.round(data.lines.reduce((s, l) => s + l.debit, 0) * 100) / 100;
   const totalCredit = Math.round(data.lines.reduce((s, l) => s + l.credit, 0) * 100) / 100;
@@ -70,5 +75,7 @@ export async function POST(req: NextRequest) {
     include: { lines: { include: { account: true } } },
   });
 
+  // A manual entry may touch a bank / cash account.
+  await refreshBankBalances().catch(() => undefined);
   return NextResponse.json(entry ?? createdEntry, { status: 201 });
 }

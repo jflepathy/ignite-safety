@@ -1,0 +1,17 @@
+ALTER TABLE "sales_receipts" ADD COLUMN "bankAccountId" TEXT;
+ALTER TABLE "sales_receipts" ADD CONSTRAINT "sales_receipts_bankAccountId_fkey" FOREIGN KEY ("bankAccountId") REFERENCES "bank_accounts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "refund_receipts" ADD COLUMN "bankAccountId" TEXT;
+ALTER TABLE "refund_receipts" ADD CONSTRAINT "refund_receipts_bankAccountId_fkey" FOREIGN KEY ("bankAccountId") REFERENCES "bank_accounts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "expenses" ADD COLUMN "bankAccountId" TEXT;
+ALTER TABLE "expenses" ADD CONSTRAINT "expenses_bankAccountId_fkey" FOREIGN KEY ("bankAccountId") REFERENCES "bank_accounts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "supplier_payments" ADD COLUMN "bankAccountId" TEXT;
+ALTER TABLE "supplier_payments" ADD CONSTRAINT "supplier_payments_bankAccountId_fkey" FOREIGN KEY ("bankAccountId") REFERENCES "bank_accounts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "deposits" ADD COLUMN "receiptIds" JSONB;
+ALTER TABLE "journal_entries" ADD COLUMN "sourceType" TEXT;
+ALTER TABLE "journal_entries" ADD COLUMN "sourceId" TEXT;
+CREATE UNIQUE INDEX "journal_entries_sourceType_sourceId_key" ON "journal_entries"("sourceType", "sourceId");
+CREATE INDEX "journal_entries_date_idx" ON "journal_entries"("date");
+CREATE INDEX "journal_lines_accountId_idx" ON "journal_lines"("accountId");
+CREATE INDEX "journal_lines_journalEntryId_idx" ON "journal_lines"("journalEntryId");
+ALTER TABLE "invoices" ADD COLUMN "creditApplied" DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE "app_settings" ADD COLUMN "booksClosedThrough" TIMESTAMP(3);

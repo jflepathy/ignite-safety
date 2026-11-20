@@ -44,10 +44,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Accounting',
     icon: '📚',
     items: [
+      { label: 'Financial Reports', href: '/accounting/reports' },
       { label: 'Chart of Accounts', href: '/accounting/chart-of-accounts' },
       { label: 'Reconcile', href: '/accounting/reconcile' },
       { label: 'Reclassify Transactions', href: '/accounting/reclassify' },
       { label: 'Journal Entries', href: '/accounting/journal-entries' },
+      { label: 'Ledger Tools', href: '/accounting/ledger-tools' },
       { label: 'Audit Log', href: '/accounting/audit-log' },
     ],
   },

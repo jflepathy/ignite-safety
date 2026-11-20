@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
+import { recomputeInvoiceBalance } from '@/lib/invoice-balance';
+
 import { insertEstimateOrInvoiceLines } from '@/lib/bulk-line-items';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -66,6 +70,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const existing = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: true } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const locked = await closedPeriodResponse(existing.issueDate);
+  if (locked) return locked;
+  if (data.status === 'VOID' && existing.payments.length > 0) {
+    const msg = 'This invoice has payments recorded against it. Reverse the payments first, then void it.';
+    return NextResponse.json({ error: { formErrors: [msg] }, message: msg }, { status: 409 });
+  }
 
   let totalsPatch = {};
   if (data.lineItems) {
@@ -90,7 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       discountTotal: totals.discountTotal,
       taxTotal: totals.taxTotal,
       total: totals.total,
-      balanceDue: Math.max(totals.total - amountPaid, 0),
+      balanceDue: Math.max(totals.total - amountPaid - Number(existing.creditApplied), 0),
     };
   }
 
@@ -119,6 +129,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...totalsPatch,
     },
   });
+  // Totals or status changed: re-derive the balance (payments + credit notes) and re-post.
+  if (data.lineItems || data.status) {
+    const st = data.status ?? existing.status;
+    if (st !== 'DRAFT' && st !== 'VOID') await recomputeInvoiceBalance(params.id);
+  }
+  await syncLedger([{ type: 'INVOICE', id: params.id }]);
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
     include: { lineItems: true, customer: true, payments: true },
@@ -130,9 +146,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const { session, error } = await requireRole('ADMIN');
   if (error) return error;
-  const existing = await prisma.invoice.findUnique({ where: { id: params.id } });
+  const existing = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: { select: { id: true } } } });
   if (!existing || existing.deletedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (existing.payments.length > 0) {
+    const msg = 'This invoice has payments recorded against it. Reverse the payments first, then delete the invoice.';
+    return NextResponse.json({ error: { formErrors: [msg] }, message: msg }, { status: 409 });
+  }
+  const locked = await closedPeriodResponse(existing.issueDate);
+  if (locked) return locked;
   await prisma.invoice.update({ where: { id: params.id }, data: { deletedAt: new Date(), status: 'VOID' } });
+  await syncLedger([{ type: 'INVOICE', id: params.id }]);
   // Session 22, round 10 — this handler already existed (and voids the
   // invoice on delete), but nothing in the UI ever called it and it never
   // wrote an audit entry. Added the audit entry now that Delete is wired

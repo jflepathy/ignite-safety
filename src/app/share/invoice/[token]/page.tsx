@@ -74,6 +74,7 @@ export default async function SharedInvoicePage({ params }: { params: { token: s
           taxTotal={invoice.taxTotal.toString()}
           total={invoice.total.toString()}
           amountPaid={invoice.amountPaid.toString()}
+          creditApplied={invoice.creditApplied.toString()}
           payments={paymentLinesForDocument(invoice.payments as any)}
           balanceDue={invoice.balanceDue.toString()}
           taxInclusive={invoice.taxInclusive}

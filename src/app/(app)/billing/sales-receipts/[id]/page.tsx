@@ -15,7 +15,7 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
   const [receipt, settings] = await Promise.all([
     prisma.salesReceipt.findUnique({
       where: { id: params.id },
-      include: { customer: true, lineItems: { include: { taxRate: true, shopItem: true } } },
+      include: { customer: true, bankAccount: true, lineItems: { include: { taxRate: true, shopItem: true } } },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
@@ -74,6 +74,9 @@ export default async function SalesReceiptDetailPage({ params }: { params: { id:
             <p className="text-sm text-slate-500">{receipt.customer.displayName}</p>
             <span className="badge bg-emerald-100 text-emerald-700">
               Paid via {receipt.paymentMethod.replace('_', ' ')}
+            </span>
+            <span className="badge bg-slate-100 text-slate-600">
+              {receipt.bankAccount ? `Deposited to ${receipt.bankAccount.name}` : 'In Undeposited Funds'}
             </span>
           </div>
         </div>

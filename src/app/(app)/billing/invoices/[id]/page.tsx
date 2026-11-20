@@ -16,6 +16,7 @@ import PrintCopies from '@/components/shared/print-copies';
 import DownloadPdfButton from '@/components/shared/download-pdf-button';
 import MarkAsSentButton from '@/components/billing/mark-as-sent-button';
 import ConfirmPaymentButton from '@/components/billing/confirm-payment-button';
+import PaymentAdminActions from '@/components/billing/payment-admin-actions';
 import DeleteRecordButton from '@/components/shared/delete-record-button';
 import WhatsAppShareButton from '@/components/shared/whatsapp-share-button';
 import EmailInvoiceButton from '@/components/billing/email-invoice-button';
@@ -31,6 +32,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         lineItems: { include: { taxRate: true, shopItem: true }, orderBy: { sortOrder: 'asc' } },
         payments: { orderBy: { paidAt: 'desc' }, include: { bankAccount: true } },
         workOrder: true,
+        creditNotes: { where: { status: { in: ['ISSUED', 'APPLIED'] } }, select: { id: true, creditNoteNumber: true, issueDate: true, total: true } },
       },
     }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
@@ -95,6 +97,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
     taxTotal: invoice.taxTotal.toString(),
     total: invoice.total.toString(),
     amountPaid: invoice.amountPaid.toString(),
+    creditApplied: invoice.creditApplied.toString(),
     payments: paymentLinesForDocument(invoice.payments as any),
     balanceDue: invoice.balanceDue.toString(),
     taxInclusive: invoice.taxInclusive,
@@ -149,6 +152,11 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           )}
           <PrintButton />
           <DownloadPdfButton document={documentData} fileName={invoice.invoiceNumber} />
+          {invoice.status !== 'DRAFT' && invoice.status !== 'VOID' && Number(invoice.balanceDue) > 0 && (
+            <Link href={`/billing/credit-notes/new?invoiceId=${invoice.id}`} className="btn-secondary">
+              Credit Note
+            </Link>
+          )}
           {isAdmin && (
             <DeleteRecordButton
               apiUrl={`/api/invoices/${invoice.id}`}
@@ -184,6 +192,23 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         }))}
       />
 
+      {invoice.creditNotes.length > 0 && (
+        <div className="card p-6 print:hidden">
+          <h2 className="mb-3 text-sm font-semibold text-ink-900">Credit Notes Applied</h2>
+          <table className="w-full text-sm">
+            <tbody>
+              {invoice.creditNotes.map((c) => (
+                <tr key={c.id} className="border-t border-slate-100">
+                  <td className="py-2">{c.creditNoteNumber}</td>
+                  <td className="py-2 text-slate-500">{formatDate(c.issueDate)}</td>
+                  <td className="py-2 text-right font-medium">-{formatMoney(c.total.toString(), currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {invoice.payments.length > 0 && (
         <div className="card p-6 print:hidden">
           <h2 className="mb-3 text-sm font-semibold text-ink-900">Payment History</h2>
@@ -218,6 +243,14 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
                       )}
                       {(p as any).proofNotes && <p className="mt-1 text-xs text-slate-400">{(p as any).proofNotes}</p>}
                       <div className="mt-1 flex items-center gap-3 print:hidden">
+                        {isAdmin && (
+                          <PaymentAdminActions
+                            invoiceId={invoice.id}
+                            paymentId={p.id}
+                            bankAccountId={p.bankAccountId}
+                            bankAccounts={bankAccounts.map((a) => ({ id: a.id, name: a.name }))}
+                          />
+                        )}
                         {proofPhotoUrl && (
                           <a href={proofPhotoUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand-600 hover:underline">
                             View photo

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import SalesReceiptFormClient from '@/components/billing/sales-receipt-form-client';
 
 export default async function EditSalesReceiptPage({ params }: { params: { id: string } }) {
-  const [receipt, customers, shopItems, taxRates, settings] = await Promise.all([
+  const [receipt, customers, shopItems, taxRates, settings, bankAccounts] = await Promise.all([
     prisma.salesReceipt.findUnique({
       where: { id: params.id },
       include: { lineItems: true },
@@ -12,6 +12,7 @@ export default async function EditSalesReceiptPage({ params }: { params: { id: s
     prisma.shopItem.findMany({ where: { active: true }, orderBy: { sku: 'asc' } }),
     prisma.taxRate.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    prisma.bankAccount.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
   if (!receipt) notFound();
 
@@ -26,11 +27,12 @@ export default async function EditSalesReceiptPage({ params }: { params: { id: s
         shopItems={shopItems.map((s) => ({ id: s.id, sku: s.sku, name: s.name, unitPrice: s.unitPrice.toString() }))}
         taxRates={taxRates.map((t) => ({ id: t.id, name: t.name, ratePercent: t.ratePercent.toString() }))}
         currency={settings?.currencyCode ?? 'SCR'}
+        bankAccounts={bankAccounts}
         mode="edit"
         recordId={receipt.id}
         initial={{
           partyId: receipt.customerId,
-          extraValues: { paymentMethod: receipt.paymentMethod },
+          extraValues: { paymentMethod: receipt.paymentMethod, bankAccountId: receipt.bankAccountId ?? '' },
           lines: receipt.lineItems.map((li) => ({
             key: li.id,
             shopItemId: li.shopItemId,

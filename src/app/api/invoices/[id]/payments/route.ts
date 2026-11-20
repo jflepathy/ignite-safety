@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
+import { recomputeInvoiceBalance } from '@/lib/invoice-balance';
+
 
 const PaymentSchema = z.object({
   amount: z.number().positive(),
@@ -24,6 +28,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const invoice = await prisma.invoice.findUnique({ where: { id: params.id }, include: { payments: true } });
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  const locked = await closedPeriodResponse(data.paidAt ? new Date(data.paidAt) : new Date());
+  if (locked) return locked;
+
   const bankAccount = await prisma.bankAccount.findUnique({ where: { id: data.bankAccountId } });
   if (!bankAccount) return NextResponse.json({ error: 'That account no longer exists' }, { status: 400 });
 
@@ -43,25 +50,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Sequential write, not $transaction() -- the Neon HTTP driver adapter
   // doesn't support it (see the numbering/deposits routes for the same
   // pattern). The balance bump is a single atomic `increment`.
-  await prisma.bankAccount.update({
-    where: { id: data.bankAccountId },
-    data: { currentBalance: { increment: data.amount } },
-  });
-
-  const totalPaid = [...invoice.payments, payment].reduce((s, p) => s + Number(p.amount), 0);
-  const total = Number(invoice.total);
-  const balanceDue = Math.max(total - totalPaid, 0);
-
-  let status: 'PARTIAL' | 'PAID' | 'SENT' | 'OVERDUE' = invoice.status as any;
-  if (balanceDue <= 0) status = 'PAID';
-  else if (totalPaid > 0) status = 'PARTIAL';
-  else if (invoice.dueDate && invoice.dueDate < new Date()) status = 'OVERDUE';
-  else status = invoice.status === 'DRAFT' ? 'SENT' : (invoice.status as any);
-
-  await prisma.invoice.update({
-    where: { id: params.id },
-    data: { amountPaid: totalPaid, balanceDue, status },
-  });
+  // Bank balance now comes from the ledger (see src/lib/ledger.ts).
+  if (invoice.status === 'DRAFT') await prisma.invoice.update({ where: { id: params.id }, data: { status: 'SENT' } });
+  await recomputeInvoiceBalance(params.id);
+  await syncLedger([
+    { type: 'INVOICE', id: params.id },
+    { type: 'PAYMENT', id: payment.id },
+  ]);
   const updated = await prisma.invoice.findUnique({
     where: { id: params.id },
     include: { payments: true, customer: true, lineItems: true },

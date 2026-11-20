@@ -8,10 +8,12 @@ export default function RefundReceiptFormClient({
   customers,
   shopItems,
   currency,
+  bankAccounts,
 }: {
   customers: PartyOption[];
   shopItems: ShopItemOption[];
   currency: string;
+  bankAccounts: { id: string; name: string }[];
 }) {
   return (
     <SimpleDocForm
@@ -36,12 +38,23 @@ export default function RefundReceiptFormClient({
             </select>
           </div>
           <div>
+            <label className="label">Paid from</label>
+            <select className="input" value={values.bankAccountId ?? ''} onChange={(e) => set('bankAccountId', e.target.value)}>
+              <option value="">Select account…</option>
+              {bankAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="label">Reason</label>
             <input className="input" value={values.reason ?? ''} onChange={(e) => set('reason', e.target.value)} />
           </div>
         </>
       )}
-      buildExtraPayload={(v) => ({ method: v.method || 'CASH', reason: v.reason || undefined })}
+      buildExtraPayload={(v) => ({ method: v.method || 'CASH', bankAccountId: v.bankAccountId || '', reason: v.reason || undefined })}
       submitLabel="Save Refund Receipt"
     />
   );

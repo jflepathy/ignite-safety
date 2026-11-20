@@ -11,6 +11,7 @@ export default function TransferForm({ accounts }: { accounts: AccountOption[] }
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id ?? accounts[0]?.id ?? '');
   const [amount, setAmount] = useState(0);
   const [memo, setMemo] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,7 +22,7 @@ export default function TransferForm({ accounts }: { accounts: AccountOption[] }
       const res = await fetch('/api/transfers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fromAccountId, toAccountId, amount, memo: memo || undefined }),
+        body: JSON.stringify({ fromAccountId, toAccountId, amount, date, memo: memo || undefined }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -58,9 +59,15 @@ export default function TransferForm({ accounts }: { accounts: AccountOption[] }
           ))}
         </select>
       </div>
-      <div>
-        <label className="label">Amount</label>
-        <input type="number" step="0.01" className="input" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label">Amount</label>
+          <input type="number" step="0.01" className="input" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} />
+        </div>
+        <div>
+          <label className="label">Date</label>
+          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
       </div>
       <div>
         <label className="label">Memo</label>

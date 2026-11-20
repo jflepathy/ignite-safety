@@ -5,6 +5,8 @@ import { nextDocumentNumber } from '@/lib/numbering';
 import { computeDocumentTotals } from '@/lib/money';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 export async function GET() {
@@ -35,6 +37,8 @@ const LineSchema = z.object({
 const CreateSchema = z.object({
   customerId: z.string().min(1),
   paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).default('CASH'),
+  // Bank / cash account the money went into; empty = Undeposited Funds.
+  bankAccountId: z.string().optional().nullable(),
   notes: z.string().optional(),
   lineItems: z.array(LineSchema).min(1),
 });
@@ -57,6 +61,8 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const locked = await closedPeriodResponse(new Date());
+  if (locked) return locked;
 
   const totals = computeDocumentTotals(data.lineItems, 0);
   // Sales Receipts share the Invoice numbering counter (QuickBooks-style
@@ -73,6 +79,7 @@ export async function POST(req: NextRequest) {
       receiptNumber,
       customerId: data.customerId,
       paymentMethod: data.paymentMethod,
+      bankAccountId: data.bankAccountId || null,
       subtotal: totals.subtotal,
       taxTotal: totals.taxTotal,
       total: totals.total,
@@ -101,5 +108,6 @@ export async function POST(req: NextRequest) {
     include: { lineItems: true, customer: true },
   });
 
+  await syncLedger([{ type: 'SALES_RECEIPT', id: createdReceipt.id }]);
   return NextResponse.json(receipt ?? createdReceipt, { status: 201 });
 }

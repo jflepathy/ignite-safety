@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireEdit } from '@/lib/api-auth';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
 
 /**
  * Links a Chart-of-Accounts row to a new BankAccount row, so it shows up
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       currencyCode: parsed.data.currencyCode,
     },
   });
+  await syncLedger([{ type: 'BANK_OPENING', id: bankAccount.id }]);
   return NextResponse.json(bankAccount, { status: 201 });
 }
 
@@ -85,13 +87,20 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   const bankAccountId = account.bankAccount.id;
-  const [paymentCount, depositCount, transactionCount] = await Promise.all([
+  const [paymentCount, depositCount, transactionCount, otherCount] = await Promise.all([
     prisma.payment.count({ where: { bankAccountId } }),
     prisma.deposit.count({ where: { bankAccountId } }),
     prisma.bankTransaction.count({ where: { bankAccountId } }),
+    Promise.all([
+      prisma.salesReceipt.count({ where: { bankAccountId } }),
+      prisma.refundReceipt.count({ where: { bankAccountId } }),
+      prisma.expense.count({ where: { bankAccountId } }),
+      prisma.supplierPayment.count({ where: { bankAccountId } }),
+    ]).then((c) => c.reduce((a, b) => a + b, 0)),
   ]);
-  if (paymentCount + depositCount + transactionCount > 0) {
+  if (paymentCount + depositCount + transactionCount + otherCount > 0) {
     const parts: string[] = [];
+    if (otherCount) parts.push(`${otherCount} receipt/refund/expense/bill payment${otherCount === 1 ? '' : 's'}`);
     if (paymentCount) parts.push(`${paymentCount} payment${paymentCount === 1 ? '' : 's'}`);
     if (depositCount) parts.push(`${depositCount} deposit${depositCount === 1 ? '' : 's'}`);
     if (transactionCount) parts.push(`${transactionCount} bank transaction${transactionCount === 1 ? '' : 's'}`);
@@ -104,5 +113,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   await prisma.bankAccount.delete({ where: { id: bankAccountId } });
+  await syncLedger([{ type: 'BANK_OPENING', id: bankAccountId }]);
   return NextResponse.json({ ok: true });
 }

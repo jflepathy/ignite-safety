@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { syncLedger } from '@/lib/ledger';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { createEquipmentForSoldLines } from '@/lib/equipment-from-sale';
@@ -62,5 +63,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     include: { lineItems: true, customer: true },
   });
 
+  await syncLedger([{ type: 'INVOICE', id: createdInvoice.id }]);
   return NextResponse.json(invoice ?? createdInvoice, { status: 201 });
 }

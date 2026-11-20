@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { computeDocumentTotals } from '@/lib/money';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 import { insertSalesReceiptLines } from '@/lib/bulk-line-items';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -29,6 +31,7 @@ const LineItemSchema = z.object({
 const UpdateSchema = z.object({
   customerId: z.string().min(1).optional(),
   paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).optional(),
+  bankAccountId: z.string().optional().nullable(),
   notes: z.string().optional(),
   lineItems: z.array(LineItemSchema).min(1).optional(),
 });
@@ -56,6 +59,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const existing = await prisma.salesReceipt.findUnique({ where: { id: params.id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const locked = await closedPeriodResponse(existing.saleDate);
+  if (locked) return locked;
 
   let totalsPatch = {};
   if (data.lineItems) {
@@ -84,6 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data: {
       ...(data.customerId ? { customerId: data.customerId } : {}),
       ...(data.paymentMethod ? { paymentMethod: data.paymentMethod } : {}),
+      ...(data.bankAccountId !== undefined ? { bankAccountId: data.bankAccountId || null } : {}),
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
       ...totalsPatch,
     },
@@ -93,5 +99,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     include: { lineItems: true, customer: true },
   });
 
+  await syncLedger([{ type: 'SALES_RECEIPT', id: params.id }]);
   return NextResponse.json(receipt);
 }

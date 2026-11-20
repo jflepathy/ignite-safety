@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -27,6 +29,8 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const locked = await closedPeriodResponse((data as any).date ? new Date((data as any).date) : new Date());
+  if (locked) return locked;
 
   // Sequential writes instead of $transaction() — see src/lib/prisma.ts.
   const adjustment = await prisma.inventoryAdjustment.create({
@@ -37,5 +41,6 @@ export async function POST(req: NextRequest) {
     data: { quantityOnHand: { increment: data.quantityChange } },
   });
 
+  await syncLedger([{ type: 'INVENTORY_ADJUSTMENT', id: adjustment.id }]);
   return NextResponse.json(adjustment, { status: 201 });
 }

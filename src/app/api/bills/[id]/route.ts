@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireEdit } from '@/lib/api-auth';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 // Header-field edits only (reference #, due date, terms, notes, status) —
 // not the line items/amounts. A bill's subtotal/tax/total/balanceDue are
@@ -29,7 +31,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // call needs an implicit transaction on this table's relations, which
   // the Neon HTTP adapter can't run ("Transactions are not supported in
   // HTTP mode"). Same fix as the other document PATCH routes.
+  const existing = await prisma.bill.findUnique({ where: { id: params.id }, select: { billDate: true } });
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const locked = await closedPeriodResponse(existing.billDate);
+  if (locked) return locked;
   await prisma.bill.update({ where: { id: params.id }, data });
+  await syncLedger([{ type: 'BILL', id: params.id }]);
   const bill = await prisma.bill.findUnique({ where: { id: params.id }, include: { supplier: true, billLineItems: true } });
   return NextResponse.json(bill);
 }

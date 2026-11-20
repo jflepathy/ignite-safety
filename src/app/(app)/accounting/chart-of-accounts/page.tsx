@@ -5,15 +5,20 @@ import { canEditModule } from '@/lib/edit-permissions-constants';
 import QuickAddButton from '@/components/shared/quick-add-button';
 import QuickEditButton from '@/components/shared/quick-edit-button';
 import RemoveDepositAccountButton from '@/components/accounting/remove-deposit-account-button';
+import Link from 'next/link';
+import { formatMoney } from '@/lib/money';
+import { accountTotals, naturalBalance } from '@/lib/ledger-reports';
 
 const TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'];
 
 export default async function ChartOfAccountsPage() {
-  const [accounts, session, settings] = await Promise.all([
+  const [accounts, session, settings, totals] = await Promise.all([
     prisma.account.findMany({ orderBy: { code: 'asc' }, include: { bankAccount: true } }),
     getServerSession(authOptions),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
+    accountTotals({}),
   ]);
+  const balanceOf = new Map(totals.map((t) => [t.id, naturalBalance(t)]));
   const isAdmin = session?.user.role === 'ADMIN';
   const canEdit = canEditModule('chartOfAccounts', isAdmin, session?.user.editModules);
   const currencyCode = settings?.currencyCode ?? 'SCR';
@@ -62,6 +67,7 @@ export default async function ChartOfAccountsPage() {
                   <th className="px-4 py-2">Name</th>
                   <th className="px-4 py-2">Subtype</th>
                   <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2 text-right">Balance</th>
                   {canEdit && <th className="px-4 py-2"></th>}
                 </tr>
               </thead>
@@ -79,6 +85,11 @@ export default async function ChartOfAccountsPage() {
                     </td>
                     <td className="px-4 py-2 text-slate-500">{a.subtype ?? '—'}</td>
                     <td className="px-4 py-2 text-slate-500">{a.isActive ? 'Active' : 'Inactive'}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Link href={`/accounting/ledger/${a.id}`} className="font-medium text-ink-900 hover:text-brand-600 hover:underline">
+                        {formatMoney(balanceOf.get(a.id) ?? 0, currencyCode)}
+                      </Link>
+                    </td>
                     {canEdit && (
                       <td className="px-4 py-2 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -140,7 +151,7 @@ export default async function ChartOfAccountsPage() {
                 ))}
                 {g.accounts.length === 0 && (
                   <tr>
-                    <td colSpan={canEdit ? 5 : 4} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={canEdit ? 6 : 5} className="px-4 py-6 text-center text-slate-400">
                       No {g.type.toLowerCase()} accounts yet.
                     </td>
                   </tr>

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -24,6 +26,7 @@ const CreateSchema = z.object({
   customerId: z.string().min(1),
   invoiceId: z.string().optional().nullable(),
   method: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).default('CASH'),
+  bankAccountId: z.string().min(1, 'Select the account the refund was paid from'),
   reason: z.string().optional(),
   lineItems: z.array(LineSchema).min(1),
 });
@@ -44,6 +47,8 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
+  const locked = await closedPeriodResponse(new Date());
+  if (locked) return locked;
 
   const lineTotals = data.lineItems.map((l) => Math.round(l.quantity * l.unitPrice * 100) / 100);
   const total = Math.round(lineTotals.reduce((s, n) => s + n, 0) * 100) / 100;
@@ -58,6 +63,7 @@ export async function POST(req: NextRequest) {
       customerId: data.customerId,
       invoiceId: data.invoiceId || null,
       method: data.method,
+      bankAccountId: data.bankAccountId,
       reason: data.reason,
       subtotal: total,
       total,
@@ -86,5 +92,6 @@ export async function POST(req: NextRequest) {
     include: { lineItems: true, customer: true },
   });
 
+  await syncLedger([{ type: 'REFUND_RECEIPT', id: createdRefund.id }]);
   return NextResponse.json(refund ?? createdRefund, { status: 201 });
 }

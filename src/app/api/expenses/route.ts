@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { nextDocumentNumber } from '@/lib/numbering';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -17,6 +19,7 @@ export async function GET() {
 // selected, a free-text vendor name may be recorded instead.
 const CreateSchema = z.object({
   accountId: z.string().min(1, 'A Chart of Accounts category is required.'),
+  bankAccountId: z.string().min(1, 'Select the account this was paid from.'),
   supplierId: z.string().optional(),
   vendor: z.string().optional(),
   description: z.string().optional(),
@@ -33,6 +36,8 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { date, accountId, ...rest } = parsed.data;
+  const locked = await closedPeriodResponse(date ? new Date(date) : new Date());
+  if (locked) return locked;
 
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   if (!account || account.type !== 'EXPENSE') {
@@ -43,5 +48,6 @@ export async function POST(req: NextRequest) {
   const expense = await prisma.expense.create({
     data: { ...rest, accountId, category: account.name, date: date ? new Date(date) : new Date(), expenseNumber },
   });
+  await syncLedger([{ type: 'EXPENSE', id: expense.id }]);
   return NextResponse.json(expense, { status: 201 });
 }

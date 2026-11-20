@@ -50,6 +50,8 @@ export type InvoiceDocumentData = {
   taxTotal: string;
   total: string;
   amountPaid?: string;
+  /** Credit notes applied to this invoice (reduces the balance). */
+  creditApplied?: string;
   /** Payments received, printed under the total (date, method, amount). */
   payments?: DocumentPayment[];
   balanceDue: string;
@@ -99,6 +101,7 @@ export default function InvoiceDocument({
   taxTotal,
   total,
   amountPaid,
+  creditApplied,
   payments,
   balanceDue,
   taxInclusive,
@@ -122,6 +125,7 @@ export default function InvoiceDocument({
   taxTotal: string;
   total: string;
   amountPaid?: string;
+  creditApplied?: string;
   payments?: DocumentPayment[];
   balanceDue: string;
   taxInclusive?: boolean;
@@ -296,6 +300,12 @@ export default function InvoiceDocument({
                     <span>-{formatMoney(amountPaid!, currency)}</span>
                   </div>
                 ))}
+              {creditApplied !== undefined && Number(creditApplied) > 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Credit applied</span>
+                  <span>-{formatMoney(creditApplied, currency)}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 py-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{totalLabel}</span>

@@ -114,6 +114,7 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     taxTotal,
     total,
     amountPaid,
+    creditApplied,
     payments,
     balanceDue,
     totalLabel = 'Balance Due',
@@ -420,6 +421,9 @@ export async function buildDocumentPdf(doc: InvoiceDocumentData): Promise<jsPDF>
     } else {
       rows.push({ label: 'Paid', value: `-${formatMoney(amountPaid!, currency)}` });
     }
+  }
+  if (creditApplied !== undefined && Number(creditApplied) > 0) {
+    rows.push({ label: 'Credit applied', value: `-${formatMoney(creditApplied, currency)}` });
   }
   pdf.setFontSize(FS.xs);
   for (const r of rows) {

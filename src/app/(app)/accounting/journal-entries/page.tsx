@@ -5,7 +5,7 @@ import { formatDate } from '@/lib/format-date';
 
 export default async function JournalEntriesPage() {
   const [entries, settings] = await Promise.all([
-    prisma.journalEntry.findMany({ include: { lines: { include: { account: true } } }, orderBy: { date: 'desc' } }),
+    prisma.journalEntry.findMany({ where: { sourceType: null }, include: { lines: { include: { account: true } } }, orderBy: { date: 'desc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';

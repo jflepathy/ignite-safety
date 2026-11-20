@@ -11,14 +11,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
   const toDate = searchParams?.to ? new Date(new Date(searchParams.to).getTime() + 24 * 60 * 60 * 1000 - 1) : null;
   const dateRange = fromDate || toDate ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : undefined;
 
-  const [settings, invoices, payments, expenses] = await Promise.all([
+  const [settings, invoices, payments, expenses, receipts, refunds, billPayments] = await Promise.all([
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.invoice.findMany({
       where: { deletedAt: null, status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] }, balanceDue: { gt: 0 } },
       include: { customer: true },
     }),
-    prisma.payment.findMany({ where: dateRange ? { paidAt: dateRange } : undefined }),
+    prisma.payment.findMany({ where: { verificationStatus: { in: ['NONE', 'CONFIRMED'] }, ...(dateRange ? { paidAt: dateRange } : {}) } }),
     prisma.expense.findMany({ where: dateRange ? { date: dateRange } : undefined }),
+    prisma.salesReceipt.findMany({ where: dateRange ? { saleDate: dateRange } : undefined, select: { total: true } }),
+    prisma.refundReceipt.findMany({ where: dateRange ? { refundDate: dateRange } : undefined, select: { total: true } }),
+    prisma.supplierPayment.findMany({ where: dateRange ? { paidAt: dateRange } : undefined, select: { amount: true } }),
   ]);
 
   const currency = settings?.currencyCode ?? 'SCR';
@@ -38,8 +41,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
   });
   const grandTotal = Object.values(buckets).reduce((a, b) => a + b, 0);
 
-  const income = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const expenseTotal = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  // Cash basis: money actually received / paid out. The accrual P&L lives under Accounting > Financial Reports.
+  const income =
+    payments.reduce((s, p) => s + Number(p.amount), 0) +
+    receipts.reduce((s, r) => s + Number(r.total), 0) -
+    refunds.reduce((s, r) => s + Number(r.total), 0);
+  const expenseTotal = expenses.reduce((s, e) => s + Number(e.amount), 0) + billPayments.reduce((s, p) => s + Number(p.amount), 0);
   const invoicesAll = await prisma.invoice.findMany({
     where: { deletedAt: null, status: { not: 'VOID' }, ...(dateRange ? { issueDate: dateRange } : {}) },
     select: { subtotal: true, taxTotal: true },
@@ -119,15 +126,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
-          <h2 className="mb-4 text-sm font-semibold text-ink-900">Income vs. Expense Summary</h2>
+          <h2 className="mb-4 text-sm font-semibold text-ink-900">Money In vs. Money Out (cash basis)</h2>
           <p className="mb-3 text-xs text-slate-400">{rangeLabel}</p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-600">Total Income (payments received)</span>
+              <span className="text-slate-600">Money in (invoice payments + sales receipts − refunds)</span>
               <span className="font-medium text-emerald-600">{formatMoney(income, currency)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-600">Total Expenses</span>
+              <span className="text-slate-600">Money out (expenses + bill payments)</span>
               <span className="font-medium text-red-600">{formatMoney(expenseTotal, currency)}</span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-semibold">
@@ -137,6 +144,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: { fr
               </span>
             </div>
           </div>
+          <a href="/accounting/reports" className="mt-3 inline-block text-xs text-brand-600 hover:underline print:hidden">
+            Full Profit &amp; Loss (accrual) →
+          </a>
         </div>
 
         <div className="card p-6">

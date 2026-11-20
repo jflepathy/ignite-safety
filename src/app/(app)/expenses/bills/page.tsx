@@ -14,10 +14,11 @@ function toDateInput(d: Date | null) {
 }
 
 export default async function BillsPage() {
-  const [bills, settings, session] = await Promise.all([
+  const [bills, settings, session, bankAccounts] = await Promise.all([
     prisma.bill.findMany({ include: { supplier: true }, orderBy: { billDate: 'desc' } }),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     getServerSession(authOptions),
+    prisma.bankAccount.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
   const currency = settings?.currencyCode ?? 'SCR';
   const totalOwed = bills.reduce((s, b) => s + Number(b.balanceDue), 0);
@@ -100,7 +101,7 @@ export default async function BillsPage() {
                         ]}
                       />
                     )}
-                    {Number(b.balanceDue) > 0 && <PayBillButton billId={b.id} maxAmount={Number(b.balanceDue)} currency={currency} />}
+                    {Number(b.balanceDue) > 0 && <PayBillButton billId={b.id} maxAmount={Number(b.balanceDue)} currency={currency} bankAccounts={bankAccounts} />}
                   </div>
                 </td>
               </tr>

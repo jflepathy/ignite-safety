@@ -14,6 +14,11 @@ const JOBS: { path: string; method: string; repeat: boolean }[] = [
   { path: '/api/cron/reminders', method: 'POST', repeat: true },
   { path: '/api/cron/service-due', method: 'POST', repeat: true },
   { path: '/api/admin/exchange-rates/refresh', method: 'POST', repeat: false },
+  // Nightly ledger rebuild (accounting plan): re-posts every document so the books
+  // self-heal if a sync was ever missed.
+  { path: '/api/cron/ledger?part=1', method: 'POST', repeat: false },
+  { path: '/api/cron/ledger?part=2', method: 'POST', repeat: false },
+  { path: '/api/cron/ledger?part=3', method: 'POST', repeat: false },
 ];
 
 async function runJobs(env: any) {

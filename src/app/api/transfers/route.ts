@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { z } from 'zod';
+import { syncLedger } from '@/lib/ledger';
+import { closedPeriodResponse } from '@/lib/period-lock';
 
 export async function GET() {
   const { error } = await requireRole('ADMIN', 'SALES');
@@ -18,6 +20,7 @@ const CreateSchema = z.object({
   toAccountId: z.string().min(1),
   amount: z.number().positive(),
   memo: z.string().optional(),
+  date: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -29,9 +32,14 @@ export async function POST(req: NextRequest) {
   if (parsed.data.fromAccountId === parsed.data.toAccountId) {
     return NextResponse.json({ error: 'From and To accounts must differ' }, { status: 400 });
   }
+  const { date, ...rest } = parsed.data;
+  const when = date ? new Date(date) : new Date();
+  const locked = await closedPeriodResponse(when);
+  if (locked) return locked;
   const created = await prisma.accountTransfer.create({
-    data: { ...parsed.data, createdById: session!.user.id },
+    data: { ...rest, date: when, createdById: session!.user.id },
   });
+  await syncLedger([{ type: 'TRANSFER', id: created.id }]);
   const transfer = await prisma.accountTransfer.findUnique({
     where: { id: created.id },
     include: { fromAccount: true, toAccount: true },
