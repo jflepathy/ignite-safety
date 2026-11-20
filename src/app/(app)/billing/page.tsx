@@ -68,10 +68,26 @@ export default async function BillingPage({
 
   const outstanding = invoices.reduce((s, i) => s + Number(i.balanceDue), 0);
   const overdueCount = invoices.filter((i) => i.status === 'OVERDUE').length;
-  const paidThisMonth = invoices
-    .flatMap((i) => i.payments)
-    .filter((p) => new Date(p.paidAt).getMonth() === new Date().getMonth())
-    .reduce((s, p) => s + Number(p.amount), 0);
+  // Collected this month = invoice payments received this month PLUS sales
+  // receipts raised this month (a sales receipt is a sale paid on the spot, so
+  // it is cash collected). Month bounds are in Seychelles time (UTC+4), and
+  // both figures come from aggregate queries rather than the 100 most recent
+  // rows loaded for the tables above.
+  const SEY_OFFSET_MS = 4 * 60 * 60 * 1000;
+  const seyNow = new Date(Date.now() + SEY_OFFSET_MS);
+  const monthStart = new Date(Date.UTC(seyNow.getUTCFullYear(), seyNow.getUTCMonth(), 1) - SEY_OFFSET_MS);
+  const monthEnd = new Date(Date.UTC(seyNow.getUTCFullYear(), seyNow.getUTCMonth() + 1, 1) - SEY_OFFSET_MS);
+  const [paymentsAgg, receiptsAgg] = await Promise.all([
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { paidAt: { gte: monthStart, lt: monthEnd }, invoice: { deletedAt: null } },
+    }),
+    prisma.salesReceipt.aggregate({
+      _sum: { total: true },
+      where: { saleDate: { gte: monthStart, lt: monthEnd } },
+    }),
+  ]);
+  const paidThisMonth = Number(paymentsAgg._sum.amount ?? 0) + Number(receiptsAgg._sum.total ?? 0);
 
   return (
     <div className="space-y-6">
