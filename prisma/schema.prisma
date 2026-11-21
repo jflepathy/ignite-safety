@@ -853,6 +853,7 @@ model BankAccount {
   createdAt           DateTime @default(now())
 
   transactions BankTransaction[]
+  statementImports BankStatementImport[]
   deposits     Deposit[]
   payments     Payment[]
   salesReceipts    SalesReceipt[]    @relation("SalesReceiptBank")
@@ -873,10 +874,43 @@ model BankTransaction {
   reconciled       Boolean     @default(false)
   matchedInvoiceId String?
   matchedBillId    String?
+  // Bank statement import + reconciliation (accounting plan, Phase 3)
+  reference        String?
+  balance          Decimal?    @db.Decimal(14, 2) // running balance printed on the statement, if any
+  importId         String?
+  import           BankStatementImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+  dedupeKey        String? // same line imported twice is skipped
+  matchType        String? // SourceType of the document this line was matched to (PAYMENT, EXPENSE, ... or JOURNAL)
+  matchId          String?
+  matchedAt        DateTime?
+  excluded         Boolean     @default(false) // line deliberately left out of the books (e.g. duplicate)
+  note             String?
   createdAt        DateTime    @default(now())
 
+  @@unique([bankAccountId, dedupeKey])
   @@index([bankAccountId])
+  @@index([matchType, matchId])
   @@map("bank_transactions")
+}
+
+model BankStatementImport {
+  id             String   @id @default(cuid())
+  bankAccountId  String
+  bankAccount    BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  fileName       String?
+  fromDate       DateTime?
+  toDate         DateTime?
+  openingBalance Decimal? @db.Decimal(14, 2)
+  closingBalance Decimal? @db.Decimal(14, 2)
+  rowCount       Int      @default(0)
+  importedCount  Int      @default(0)
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  transactions BankTransaction[]
+
+  @@index([bankAccountId])
+  @@map("bank_statement_imports")
 }
 
 model Deposit {
