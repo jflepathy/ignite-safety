@@ -22,7 +22,9 @@ import { syncLedger } from '@/lib/ledger';
  * account after the fact, from the Chart of Accounts page.
  */
 const CreateSchema = z.object({
-  accountType: z.enum(['CHECKING', 'SAVINGS', 'CREDIT_CARD']).default('CHECKING'),
+  // INTERCOMPANY = an account with a sister company (it owes Ignite Safety, or
+  // Ignite Safety owes it). Selectable like a bank, but not counted as cash.
+  accountType: z.enum(['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'INTERCOMPANY']).default('CHECKING'),
   accountNumberMasked: z.string().optional(),
   openingBalance: z.coerce.number().default(0),
   currencyCode: z.string().min(1).default('SCR'),

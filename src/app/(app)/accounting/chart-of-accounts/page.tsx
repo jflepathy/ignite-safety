@@ -108,6 +108,7 @@ export default async function ChartOfAccountsPage() {
                                     { value: 'CHECKING', label: 'Checking' },
                                     { value: 'SAVINGS', label: 'Savings' },
                                     { value: 'CREDIT_CARD', label: 'Credit Card' },
+                                    { value: 'INTERCOMPANY', label: 'Inter-company (sister company)' },
                                   ],
                                   defaultValue: 'CHECKING',
                                 },
