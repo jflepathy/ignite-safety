@@ -83,6 +83,11 @@ type Ctx = {
 };
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** The day the books moved from QuickBooks. Invoices dated before it are
+ * QuickBooks history: their revenue is already in the opening balances, so
+ * they post against Opening Balance Equity, not income. */
+export const BOOKS_START = new Date('2026-09-22T00:00:00Z');
 const num = (d: any) => (d == null ? 0 : Number(d));
 
 async function loadCtx(): Promise<Ctx> {
@@ -203,8 +208,8 @@ async function build(type: SourceType, ids: string[] | null, ctx: Ctx): Promise<
         const tax = num(r.taxTotal);
         const desc = `Invoice ${r.invoiceNumber} · ${r.customer.displayName}`;
         const b = new EntryBuilder().dr(ctx.code(CODES.AR), total, desc);
-        if (r.invoiceNumber.startsWith('OB-')) {
-          b.cr(ctx.code(CODES.OPENING_EQUITY), total - tax, desc); // opening A/R brought forward
+        if (r.invoiceNumber.startsWith('OB-') || r.issueDate < BOOKS_START) {
+          b.cr(ctx.code(CODES.OPENING_EQUITY), total - tax, desc); // opening A/R brought forward (QuickBooks history)
         } else {
           postIncome(b, ctx, r.lineItems, total - tax, 1, desc);
         }

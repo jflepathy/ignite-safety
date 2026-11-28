@@ -73,6 +73,9 @@ export async function buildStatement(customerId: string, opts: { from?: Date | n
 
   type Tx = { at: Date; type: StatementLine['type']; ref: string; description: string; charge: number; credit: number };
   const txs: Tx[] = [];
+  // One bank transfer that settled several invoices is shown as ONE payment
+  // line (refs joined), not split per invoice.
+  const payGroups = new Map<string, { at: Date; refs: string[]; description: string; credit: number }>();
   for (const inv of invoices) {
     txs.push({
       at: inv.issueDate,
@@ -88,15 +91,18 @@ export async function buildStatement(customerId: string, opts: { from?: Date | n
       // opening-balance invoice raised later) is placed on the invoice date
       // so the running balance never dips below what was actually owed.
       const late = p.paidAt < inv.issueDate;
-      txs.push({
-        at: late ? inv.issueDate : p.paidAt,
-        type: 'PAYMENT',
-        ref: inv.invoiceNumber,
-        description: `Payment${late ? ' of ' + formatDate(p.paidAt) : ''} - ${METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference.slice(0, 40)})` : ''}`,
-        charge: 0,
-        credit: Number(p.amount),
-      });
+      const at = late ? inv.issueDate : p.paidAt;
+      const description = `Payment${late ? ' of ' + formatDate(p.paidAt) : ''} - ${METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference.slice(0, 40)})` : ''}`;
+      const key = `${at.toISOString()}|${p.paidAt.toISOString()}|${p.method}|${p.reference ?? ''}|${p.bankAccountId ?? ''}`;
+      const g = payGroups.get(key);
+      if (g) {
+        g.credit = r2(g.credit + Number(p.amount));
+        if (!g.refs.includes(inv.invoiceNumber)) g.refs.push(inv.invoiceNumber);
+      } else payGroups.set(key, { at, refs: [inv.invoiceNumber], description, credit: Number(p.amount) });
     }
+  }
+  for (const g of payGroups.values()) {
+    txs.push({ at: g.at, type: 'PAYMENT', ref: g.refs.join(', '), description: g.description, charge: 0, credit: g.credit });
   }
   for (const cn of creditNotes) {
     txs.push({ at: cn.issueDate, type: 'CREDIT', ref: cn.creditNoteNumber, description: 'Credit note', charge: 0, credit: Number(cn.total) });
