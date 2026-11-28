@@ -14,7 +14,7 @@ export type RecLine = {
   matchLabel: string | null;
   matchMissing: boolean;
   note: string | null;
-  candidates: { type: string; id: string; label: string; date: string; mode: 'match' | 'move'; bankName: string }[];
+  candidates: { type: string; id: string; label: string; date: string; mode: 'match' | 'move'; bankName: string; fee: number | null }[];
 };
 type Opt = { id: string; label: string; amount?: number };
 
@@ -220,6 +220,7 @@ export default function ReconcileTable({
                         onClick={() => act(l.id, { action: 'match', type: c.type, id: c.id })}
                       >
                         {c.mode === 'match' ? 'Match' : `Move from ${c.bankName} & match`}
+                        {c.fee ? ` less card fee ${fmt(c.fee)}` : ''}
                       </button>
                       <span className="text-xs text-slate-600">
                         {c.label} · {c.date}

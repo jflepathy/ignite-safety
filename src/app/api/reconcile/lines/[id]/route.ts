@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api-auth';
 import { z } from 'zod';
-import { matchLine, markMatched, refreshBankBalances } from '@/lib/reconcile';
+import { matchLine, markMatched, refreshBankBalances, removeLineFee } from '@/lib/reconcile';
 import { syncLedger, SOURCE_TYPES, type SourceType } from '@/lib/ledger';
 import { closedPeriodResponse } from '@/lib/period-lock';
 import { nextDocumentNumber } from '@/lib/numbering';
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const abs = Math.abs(amt);
 
   if (a.action === 'unmatch') {
+    await removeLineFee(txn.id);
     await prisma.bankTransaction.update({ where: { id: txn.id }, data: { matchType: null, matchId: null, matchedAt: null, reconciled: false } });
     return NextResponse.json({ ok: true });
   }
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (txn.matchType) return bad('This line is already matched. Unmatch it first.', 409);
 
   if (a.action === 'match') {
+    const locked = await closedPeriodResponse(txn.date);
+    if (locked) return locked;
     try {
       await matchLine(txn.id, a.type as SourceType, a.id);
     } catch (e: any) {

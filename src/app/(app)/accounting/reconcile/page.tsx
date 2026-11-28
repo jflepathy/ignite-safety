@@ -4,8 +4,8 @@ import { formatMoney } from '@/lib/money';
 import { formatDate } from '@/lib/format-date';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { findCandidates } from '@/lib/reconcile';
-import { SOURCE_LABEL, type SourceType } from '@/lib/ledger';
+import { findCandidates, feeRef } from '@/lib/reconcile';
+import { SOURCE_LABEL, BOOKS_START, type SourceType } from '@/lib/ledger';
 import { dayEnd } from '@/lib/ledger-reports';
 import ReconcileTable, { type RecLine } from '@/components/accounting/reconcile-table';
 import { AutoMatchButton, UndoImportButton } from '@/components/accounting/reconcile-buttons';
@@ -116,6 +116,7 @@ export default async function ReconcilePage({ searchParams }: { searchParams: { 
           date: formatDate(c.date),
           mode: c.mode,
           bankName: c.bankName,
+          fee: c.fee ?? null,
         })),
       };
     });
@@ -123,13 +124,16 @@ export default async function ReconcilePage({ searchParams }: { searchParams: { 
     // In the books on this bank, within the imported statement dates, but not on any statement line.
     const from = imports.reduce((a, i) => (i.fromDate && i.fromDate < a ? i.fromDate : a), imports[0].fromDate ?? new Date());
     const to = new Date((imports[0].toDate ?? new Date()).getTime() + 24 * 3600 * 1000);
-    const matched = new Set(
-      (await prisma.bankTransaction.findMany({ where: { matchType: { not: null } }, select: { matchType: true, matchId: true } })).map((r) => `${r.matchType}:${r.matchId}`)
-    );
+    const matchedLines = await prisma.bankTransaction.findMany({ where: { matchType: { not: null } }, select: { id: true, matchType: true, matchId: true } });
+    const matched = new Set(matchedLines.map((r) => `${r.matchType}:${r.matchId}`));
+    // Card fees booked with a matched settlement line are on the statement too (netted).
+    const lineFeeRefs = new Set(matchedLines.map((r) => feeRef(r.id)));
+    // Payments before the books start post to opening balance, not to the bank.
+    const payFrom = from > BOOKS_START ? from : BOOKS_START;
     const [p, r, e, sp, rf, tr, dp] = await Promise.all([
-      prisma.payment.findMany({ where: { bankAccountId: bank.id, paidAt: { gte: from, lt: to } }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { displayName: true } } } } } }),
+      prisma.payment.findMany({ where: { bankAccountId: bank.id, paidAt: { gte: payFrom, lt: to } }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { displayName: true } } } } } }),
       prisma.salesReceipt.findMany({ where: { bankAccountId: bank.id, saleDate: { gte: from, lt: to } }, include: { customer: { select: { displayName: true } } } }),
-      prisma.expense.findMany({ where: { bankAccountId: bank.id, date: { gte: from, lt: to } } }),
+      prisma.expense.findMany({ where: { bankAccountId: bank.id, date: { gte: from, lt: to } } }).then((rows) => rows.filter((x) => !x.reference || !lineFeeRefs.has(x.reference))),
       prisma.supplierPayment.findMany({ where: { bankAccountId: bank.id, paidAt: { gte: from, lt: to } }, include: { bill: { select: { billNumber: true } } } }),
       prisma.refundReceipt.findMany({ where: { bankAccountId: bank.id, refundDate: { gte: from, lt: to } } }),
       prisma.accountTransfer.findMany({ where: { date: { gte: from, lt: to }, OR: [{ fromAccountId: bank.accountId }, { toAccountId: bank.accountId }] }, include: { fromAccount: true, toAccount: true } }),

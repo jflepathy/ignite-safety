@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { syncLedger, refreshBankBalances, type SourceType } from '@/lib/ledger';
+import { nextDocumentNumber } from '@/lib/numbering';
 
 /**
  * Bank reconciliation (accounting plan, Phase 3).
@@ -27,7 +28,14 @@ export type Candidate = {
   bankName: string;
   mode: 'match' | 'move';
   score: number;
+  /** Card settlement: the bank paid this sale less the card fee (gross − net). */
+  fee?: number;
 };
+
+/** Absa pays card sales net of a 3% merchant fee ("CARD TRNX 158139 DDMM V" = sales of DD/MM). */
+export const CARD_FEE_RATE = 0.03;
+/** Fee expenses booked by "match less card fee" carry this reference, tying them to their bank line. */
+export const feeRef = (txnId: string) => `bank-line:${txnId}`;
 
 const DAY = 24 * 3600 * 1000;
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -59,6 +67,10 @@ export async function findCandidates(
   const bank = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
   if (!bank) return out;
   const amounts = [...new Set(lines.map((l) => Math.abs(r2(l.amount))))];
+  // Gross card sales a net settlement could stand for (rounding either way).
+  const gross = (net: number) => [-0.01, 0, 0.01].map((d) => r2(net / (1 - CARD_FEE_RATE) + d));
+  const grossAmounts = [...new Set(lines.filter((l) => l.amount > 0).flatMap((l) => gross(r2(l.amount))))];
+  const inAmounts = [...new Set([...amounts, ...grossAmounts])];
   const min = new Date(Math.min(...lines.map((l) => l.date.getTime())) - 21 * DAY);
   const max = new Date(Math.max(...lines.map((l) => l.date.getTime())) + 21 * DAY);
   const banks = await prisma.bankAccount.findMany({ select: { id: true, name: true, accountId: true } });
@@ -67,10 +79,10 @@ export async function findCandidates(
 
   const [payments, receipts, expenses, billPays, refunds, transfers, deposits] = await Promise.all([
     prisma.payment.findMany({
-      where: { amount: { in: amounts }, paidAt: { gte: min, lte: max }, verificationStatus: { in: ['NONE', 'CONFIRMED'] } },
+      where: { amount: { in: inAmounts }, paidAt: { gte: min, lte: max }, verificationStatus: { in: ['NONE', 'CONFIRMED'] } },
       include: { invoice: { select: { invoiceNumber: true, customer: { select: { displayName: true } } } } },
     }),
-    prisma.salesReceipt.findMany({ where: { total: { in: amounts }, saleDate: { gte: min, lte: max } }, include: { customer: { select: { displayName: true } } } }),
+    prisma.salesReceipt.findMany({ where: { total: { in: inAmounts }, saleDate: { gte: min, lte: max } }, include: { customer: { select: { displayName: true } } } }),
     prisma.expense.findMany({ where: { amount: { in: amounts }, date: { gte: min, lte: max } }, include: { supplier: { select: { displayName: true } } } }),
     prisma.supplierPayment.findMany({
       where: { amount: { in: amounts }, paidAt: { gte: min, lte: max } },
@@ -155,15 +167,22 @@ export async function findCandidates(
     const lw = words(`${l.description} ${l.reference ?? ''}`);
     const cands: Candidate[] = [];
     for (const c of pool) {
-      if (Math.abs(r2(c.amount) - r2(l.amount)) > 0.004) continue;
       const days = Math.abs(c.date.getTime() - l.date.getTime()) / DAY;
+      let fee: number | undefined;
+      if (Math.abs(r2(c.amount) - r2(l.amount)) > 0.004) {
+        // Card settlement net of the fee: a sale on or up to a week before the bank line.
+        const isSale = c.type === 'PAYMENT' || c.type === 'SALES_RECEIPT';
+        const net = r2(c.amount * (1 - CARD_FEE_RATE));
+        if (!isSale || l.amount <= 0 || Math.abs(net - r2(l.amount)) > 0.011 || c.date > new Date(l.date.getTime() + DAY) || days > 7) continue;
+        fee = r2(c.amount - l.amount);
+      }
       if (days > 21) continue;
       const mode: 'match' | 'move' = c.bankAccountId === bankAccountId ? 'match' : 'move';
       // Transfers and deposits only count when on this very bank.
       if (mode === 'move' && (c.type === 'TRANSFER' || c.type === 'DEPOSIT')) continue;
       const overlap = [...words(c.label)].filter((w) => lw.has(w)).length;
-      const score = (mode === 'match' ? 50 : 30) + Math.max(0, 20 - days * 2) + Math.min(overlap, 5) * 4;
-      cands.push({ ...c, mode, score });
+      const score = (mode === 'match' ? 50 : 30) + Math.max(0, 20 - days * 2) + Math.min(overlap, 5) * 4 - (fee ? 5 : 0);
+      cands.push({ ...c, mode, score, ...(fee ? { fee } : {}) });
     }
     out.set(l.id, cands.sort((a, b) => b.score - a.score).slice(0, 5));
   }
@@ -211,7 +230,11 @@ export async function markMatched(txnId: string, type: string, id: string) {
   });
 }
 
-/** Match a bank line to a document, moving the document onto this bank first if needed. */
+/**
+ * Match a bank line to a document, moving the document onto this bank first if needed.
+ * A card settlement (candidate with a fee) also books the fee as a Bank charges
+ * expense from this bank, dated on the bank line, so the books equal the statement.
+ */
 export async function matchLine(txnId: string, type: SourceType, id: string) {
   const txn = await prisma.bankTransaction.findUnique({ where: { id: txnId } });
   if (!txn) throw new Error('Bank line not found.');
@@ -222,8 +245,35 @@ export async function matchLine(txnId: string, type: SourceType, id: string) {
     await moveDocument(type, id, txn.bankAccountId);
     await syncLedger([{ type, id }]);
   }
+  if (c.fee) {
+    const charges = await prisma.account.findFirst({ where: { code: '6000' } });
+    const expenseNumber = await nextDocumentNumber('expenseNextSeq', 'expensePrefix');
+    const e = await prisma.expense.create({
+      data: {
+        expenseNumber,
+        date: txn.date,
+        category: charges?.name ?? 'Bank charges',
+        accountId: charges?.id ?? null,
+        vendor: 'Card merchant fee',
+        description: `Card fee ${Math.round(CARD_FEE_RATE * 100)}% on ${c.amount.toFixed(2)} · ${c.label}`.slice(0, 300),
+        amount: c.fee,
+        method: 'BANK_TRANSFER',
+        reference: feeRef(txn.id),
+        bankAccountId: txn.bankAccountId,
+      },
+    });
+    await syncLedger([{ type: 'EXPENSE', id: e.id }]);
+  }
   await markMatched(txn.id, type, id);
   return c;
+}
+
+/** Undo the card fee booked when this line was matched (if any). */
+export async function removeLineFee(txnId: string) {
+  const fees = await prisma.expense.findMany({ where: { reference: feeRef(txnId) }, select: { id: true } });
+  if (!fees.length) return;
+  await prisma.expense.deleteMany({ where: { id: { in: fees.map((f) => f.id) } } });
+  await syncLedger(fees.map((f) => ({ type: 'EXPENSE' as const, id: f.id })));
 }
 
 /**
@@ -245,7 +295,7 @@ export async function autoMatch(bankAccountId: string): Promise<number> {
   const picks: { txnId: string; type: string; id: string }[] = [];
   for (const t of open) {
     const sure = (cands.get(t.id) ?? []).filter(
-      (c) => c.mode === 'match' && Math.abs(c.date.getTime() - t.date.getTime()) <= 5 * DAY && !used.has(`${c.type}:${c.id}`)
+      (c) => c.mode === 'match' && !c.fee && Math.abs(c.date.getTime() - t.date.getTime()) <= 5 * DAY && !used.has(`${c.type}:${c.id}`)
     );
     if (sure.length !== 1) continue;
     used.add(`${sure[0].type}:${sure[0].id}`);
