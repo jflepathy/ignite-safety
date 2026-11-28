@@ -226,7 +226,11 @@ async function build(type: SourceType, ids: string[] | null, ctx: Ctx): Promise<
       for (const r of rows) {
         if (r.verificationStatus === 'PENDING_REVIEW' || r.verificationStatus === 'MISMATCH') continue;
         const desc = `Payment · ${r.invoice.invoiceNumber} · ${r.invoice.customer.displayName}`;
-        const b = new EntryBuilder().dr(ctx.bankAcc(r.bankAccountId), num(r.amount), desc).cr(ctx.code(CODES.AR), num(r.amount), desc);
+        // Money received before the books moved from QuickBooks is already in the
+        // bank's opening balance (taken from the real bank statement), so it only
+        // reduces the customer's opening balance here.
+        const cashSide = r.paidAt < BOOKS_START ? ctx.code(CODES.OPENING_EQUITY) : ctx.bankAcc(r.bankAccountId);
+        const b = new EntryBuilder().dr(cashSide, num(r.amount), desc).cr(ctx.code(CODES.AR), num(r.amount), desc);
         push(r.id, r.paidAt, `${desc} (${r.method.replace('_', ' ').toLowerCase()})`, b);
       }
       break;
